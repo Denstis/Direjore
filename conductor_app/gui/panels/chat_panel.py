@@ -327,11 +327,31 @@ class ChatPanel:
         
     def show_question(self, question: str, options: List[str]) -> None:
         """Показ вопроса пользователю."""
-        self.add_message("system", f"❓ {question}")
+        logger.info(f"Показ вопроса пользователю: {question[:100] if question else 'пустой'}...")
+        logger.debug(f"Опции ответа: {options}")
         
+        # Добавляем timestamp и вопрос
+        self.history_text.config(state=tk.NORMAL)
+        
+        timestamp = f"[{__import__('datetime').datetime.now().strftime('%H:%M:%S')}] "
+        self.history_text.insert(tk.END, timestamp, "timestamp")
+        self.history_text.insert(tk.END, "\n")
+        
+        # Вставка вопроса с иконкой
+        self.history_text.insert(tk.END, "⚙️ Система: ❓ ", "system")
+        self.history_text.insert(tk.END, question, "system")
+        self.history_text.insert(tk.END, "\n\n")
+        
+        # Если есть опции, добавляем их
         if options:
             for i, option in enumerate(options, 1):
-                self.add_message("system", f"  {i}. {option}")
+                self.history_text.insert(tk.END, f"  {i}. {option}\n", "system")
+            self.history_text.insert(tk.END, "\n")
+        
+        self.history_text.config(state=tk.DISABLED)
+        self.history_text.see(tk.END)
+        
+        logger.info("Вопрос успешно отображён в интерфейсе")
                 
     def clear_history(self) -> None:
         """Очистка истории."""

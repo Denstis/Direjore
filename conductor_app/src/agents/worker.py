@@ -103,7 +103,23 @@ class Worker:
                     
             # Получение разрешённых инструментов
             allowed_schemas = self.tool_registry.get_tools_for_openai(self.allowed_tools)
-            logger.debug(f"Разрешено инструментов: {len(allowed_schemas)}")
+            
+            # Проверка что инструменты действительно доступны
+            missing_tools = []
+            for tool_name in self.allowed_tools:
+                if not self.tool_registry.has_tool(tool_name):
+                    missing_tools.append(tool_name)
+                    logger.warning(f"Инструмент {tool_name} не найден в реестре")
+                elif not self.tool_registry.has_handler(tool_name):
+                    logger.warning(f"Handler для инструмента {tool_name} не зарегистрирован")
+                    
+            if missing_tools:
+                logger.error(f"Отсутствуют инструменты в реестре: {missing_tools}")
+                # Добавляем предупреждение в сообщения агенту
+                warning_msg = f"ПРЕДУПРЕЖДЕНИЕ: Следующие инструменты недоступны: {missing_tools}. Используйте только доступные инструменты."
+                self.messages.append({"role": "system", "content": warning_msg})
+            
+            logger.debug(f"Разрешено инструментов: {len(allowed_schemas)}, список: {self.allowed_tools}")
             
             # Цикл выполнения
             iteration = 0
@@ -272,6 +288,23 @@ class Worker:
         report.tool_calls = self.tool_results
         
         return report
+
+    async def _get_memory_context(self) -> dict:
+        """Получить полный контекст из памяти проекта для агента."""
+        memory_file = self.conductor.project_path / "memory" / "project.json"
+        if not memory_file.exists():
+            return {}
+            
+        try:
+            with open(memory_file, "r", encoding="utf-8") as f:
+                all_data = json.load(f)
+            
+            # Возвращаем всю память проекта как контекст
+            logger.debug(f"Загружена память проекта: {len(all_data)} ключей")
+            return all_data
+        except Exception as e:
+            logger.error(f"Ошибка чтения памяти проекта: {e}")
+            return {}
 
     async def _get_project_context(self, keys: list[str]) -> dict:
         """Получить контекст проекта по ключам."""

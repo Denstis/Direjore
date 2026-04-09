@@ -12,6 +12,7 @@ import threading
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
+from tkinter import messagebox, ttk
 from typing import Any, Callable, Optional
 
 import yaml
@@ -295,6 +296,8 @@ class MainWindow(tk.Tk):
         def create():
             project_id = entry.get().strip()
             if project_id:
+                # Сброс чата перед инициализацией нового проекта
+                self.chat_panel.clear_history()
                 self._initialize_project(project_id)
                 dialog.destroy()
                 
@@ -302,8 +305,92 @@ class MainWindow(tk.Tk):
 
     def _open_project(self) -> None:
         """Открытие существующего проекта."""
-        # TODO: Диалог выбора проекта
-        pass
+        # Получение списка проектов из директории projects
+        projects_root = Path(self.settings.get("project_root", "./projects"))
+        
+        if not projects_root.exists():
+            messagebox.showwarning("Проекты", "Директория проектов не найдена")
+            return
+            
+        # Поиск существующих проектов (папки с state.json)
+        existing_projects = []
+        for project_dir in projects_root.iterdir():
+            if project_dir.is_dir():
+                state_file = project_dir / "state.json"
+                if state_file.exists():
+                    try:
+                        with open(state_file, "r", encoding="utf-8") as f:
+                            state_data = json.load(f)
+                        created_at = state_data.get("created_at", "Неизвестно")[:10]
+                        stage = state_data.get("stage", "unknown")
+                        existing_projects.append({
+                            "id": project_dir.name,
+                            "created": created_at,
+                            "stage": stage
+                        })
+                    except Exception:
+                        existing_projects.append({
+                            "id": project_dir.name,
+                            "created": "Неизвестно",
+                            "stage": "unknown"
+                        })
+        
+        if not existing_projects:
+            messagebox.showinfo("Проекты", "Нет существующих проектов")
+            return
+        
+        # Диалог выбора проекта
+        dialog = tk.Toplevel(self)
+        dialog.title("Открыть проект")
+        dialog.geometry("500x300")
+        
+        tk.Label(dialog, text="Выберите проект:", font=("Segoe UI", 11, "bold")).pack(pady=10)
+        
+        # Список проектов
+        listbox_frame = ttk.Frame(dialog)
+        listbox_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        listbox = tk.Listbox(listbox_frame, height=10, font=("Consolas", 10))
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        scrollbar = ttk.Scrollbar(listbox_frame, orient=tk.VERTICAL, command=listbox.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        listbox.configure(yscrollcommand=scrollbar.set)
+        
+        # Заполнение списка
+        for proj in existing_projects:
+            stage_icons = {
+                "idle": "⚪",
+                "planning": "🟡",
+                "executing": "🔵",
+                "waiting_user": "🟠",
+                "review": "🟣",
+                "done": "🟢",
+                "error": "🔴",
+            }
+            icon = stage_icons.get(proj["stage"], "⚪")
+            listbox.insert(tk.END, f"{icon} {proj['id']} ({proj['created']})")
+        
+        def open_selected():
+            selection = listbox.curselection()
+            if selection:
+                idx = selection[0]
+                project_id = existing_projects[idx]["id"]
+                # Сброс чата перед открытием проекта
+                self.chat_panel.clear_history()
+                self._initialize_project(project_id)
+                # Загрузка истории чата из лога проекта если существует
+                self._load_chat_history(project_id)
+                dialog.destroy()
+        
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=10)
+        
+        tk.Button(btn_frame, text="Открыть", command=open_selected).pack(side=tk.LEFT, padx=10)
+        tk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+        
+        # Двойной клик для открытия
+        listbox.bind("<Double-Button-1>", lambda e: open_selected())
 
     def _export_project(self) -> None:
         """Экспорт проекта в ZIP."""
@@ -416,6 +503,45 @@ class MainWindow(tk.Tk):
                 self.async_bridge.gui_queue.put(event)
                 
         future = self.async_bridge.run_coroutine(process())
+
+    def _load_chat_history(self, project_id: str) -> None:
+        """Загрузка истории чата из лога проекта."""
+        log_file = self.current_project_path / "logs" / "chat_history.log"
+        
+        if not log_file.exists():
+            logger.debug(f"История чата не найдена для проекта {project_id}")
+            return
+            
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    # Парсинг строки лога: [timestamp] role: content
+                    if line.startswith("["):
+                        # Извлечение роли и контента
+                        try:
+                            bracket_end = line.index("]")
+                            rest = line[bracket_end+1:].strip()
+                            
+                            if ": " in rest:
+                                role_part, content = rest.split(": ", 1)
+                                role_map = {
+                                    "USER": "user",
+                                    "ASSISTANT": "assistant",
+                                    "SYSTEM": "system",
+                                    "ERROR": "error",
+                                }
+                                role = role_map.get(role_part.upper(), "system")
+                                self.chat_panel.add_message(role, content)
+                        except (ValueError, IndexError):
+                            continue
+                            
+            logger.info(f"Загружена история чата для проекта {project_id}")
+        except Exception as e:
+            logger.error(f"Ошибка загрузки истории чата: {e}")
 
 
 def main():

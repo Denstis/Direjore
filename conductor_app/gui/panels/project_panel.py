@@ -2,6 +2,7 @@
 Project Panel — отображение структуры проекта, стадии, прогресса.
 """
 
+import json
 import logging
 import tkinter as tk
 from pathlib import Path
@@ -23,7 +24,7 @@ class ProjectPanel:
 
     def _create_widgets(self) -> None:
         """Создание виджетов панели."""
-        # Заголовок
+        # Заголовок с названием проекта
         header_frame = ttk.Frame(self.frame)
         header_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -32,6 +33,15 @@ class ProjectPanel:
             text="📁 ПРОЕКТ",
             font=("Segoe UI", 12, "bold"),
         ).pack(side=tk.LEFT)
+        
+        # Название текущего проекта
+        self.project_name_label = ttk.Label(
+            header_frame,
+            text="",
+            font=("Segoe UI", 10, "italic"),
+            foreground="#666666"
+        )
+        self.project_name_label.pack(side=tk.RIGHT)
         
         # Стадия
         stage_frame = ttk.LabelFrame(self.frame, text="Стадия", padding=5)
@@ -116,6 +126,10 @@ class ProjectPanel:
         name = stage_names.get(stage, stage)
         
         self.stage_label.config(text=f"{icon} {name}")
+        
+        # Обновление названия проекта
+        if self.app.current_project_id:
+            self.project_name_label.config(text=f"📄 {self.app.current_project_id}")
 
     def update_progress(self, current: int, total: int) -> None:
         """Обновление прогресс-бара."""
@@ -130,6 +144,13 @@ class ProjectPanel:
     def refresh(self) -> None:
         """Обновление дерева файлов."""
         logger.info("Пользователь нажал кнопку обновления проекта")
+        
+        # Обновление названия проекта
+        if self.app.current_project_id:
+            self.project_name_label.config(text=f"📄 {self.app.current_project_id}")
+        
+        # Загрузка состояния из state.json
+        self.load_state()
         
         # Очистка дерева
         for item in self.tree.get_children():

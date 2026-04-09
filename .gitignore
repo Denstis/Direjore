@@ -8,35 +8,42 @@ __pycache__/
 venv/
 .env
 .env.local
-.env.*
+*.env.*
 
 # Build artifacts
 dist/
 build/
 *.egg-info/
 
-# Logs and temp files
+# Logs
 *.log
-*.tmp
 
-# Editors
+# Editor/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*.tmp
 
-# Coverage reports
-.coverage
-coverage/
-htmlcov/
-
-# Python specific
-.Python
-*.so
-*.dylib
-*.dll
+# OS
+.DS_Store
+Thumbs.db
 
 # Testing
+.coverage
+htmlcov/
+.coverage.*
 .pytest_cache/
 .mypy_cache/
+
+# Distribution / packaging
+*.tar.gz
+*.whl
+*.zip
+
+# Python
+*.py[cod]
+*$py.class
+*$py.o
+*$py.d
 ```

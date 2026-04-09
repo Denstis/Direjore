@@ -96,48 +96,6 @@ class ConfigPanel:
         model_btn_frame.pack(fill=tk.X, padx=10, pady=5)
         
         ttk.Button(model_btn_frame, text="🔄 Обновить список", command=self._refresh_models).pack(side=tk.LEFT, padx=5)
-        ttk.Button(model_btn_frame, text="✏️ Редактировать", command=self._edit_model_config).pack(side=tk.LEFT, padx=5)
-        
-    def _edit_model_config(self):
-        """Редактирование конфигурации модели."""
-        selection = self.models_tree.selection()
-        if not selection:
-            messagebox.showwarning("Предупреждение", "Выберите модель для редактирования")
-            return
-            
-        item = self.models_tree.item(selection[0])
-        model_id = item["values"][0]
-        
-        # Получение пути к файлу конфигурации моделей
-        models_config_file = Path(__file__).parent.parent.parent / "config" / "models.yaml"
-        
-        if models_config_file.exists():
-            with open(models_config_file, "r", encoding="utf-8") as f:
-                content = f.read()
-            
-            # Создание диалогового окна для редактирования
-            dialog = tk.Toplevel(self.frame)
-            dialog.title(f"Редактирование модели: {model_id}")
-            dialog.geometry("600x400")
-            
-            editor = scrolledtext.ScrolledText(dialog, height=20, font=("Consolas", 10))
-            editor.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-            editor.insert("1.0", content)
-            
-            def save_config():
-                new_content = editor.get("1.0", tk.END)
-                with open(models_config_file, "w", encoding="utf-8") as f:
-                    f.write(new_content)
-                messagebox.showinfo("Успех", f"Конфигурация модели сохранена")
-                dialog.destroy()
-                self._refresh_models()
-            
-            btn_frame = ttk.Frame(dialog)
-            btn_frame.pack(fill=tk.X, padx=10, pady=5)
-            ttk.Button(btn_frame, text="💾 Сохранить", command=save_config).pack(side=tk.RIGHT, padx=5)
-            ttk.Button(btn_frame, text="❌ Отмена", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
-        else:
-            messagebox.showwarning("Предупреждение", "Файл конфигурации моделей не найден")
         
         # Конфигурация по умолчанию
         config_frame = ttk.LabelFrame(self.models_tab, text="Модель по умолчанию")

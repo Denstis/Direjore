@@ -67,10 +67,15 @@ class LMStudioClient:
                 native_info = await self._get_native_model_info(model.id)
                 if native_info:
                     info.context_window = native_info.get("context_length", info.context_window)
+                    info.supports_tools = native_info.get("supports_tools", False)
                 models.append(info)
                 self._models_cache[model.id] = info
                 logger.debug(f"Добавлена модель в кэш: {model.id}")
-            return models
+            
+            # Фильтрация несуществующих моделей (пустые или с некорректным ID)
+            filtered_models = [m for m in models if m.id and m.id.strip()]
+            
+            return filtered_models
         except Exception as e:
             logger.error(f"Ошибка получения списка моделей: {e}")
             logger.error(f"Проверьте, что LM Studio Server запущен и доступен по адресу {self.base_url}")
@@ -135,6 +140,17 @@ class LMStudioClient:
             Response object от OpenAI клиента
         """
         try:
+            # Проверка наличия загруженной модели в LM Studio
+            if model not in self._models_cache and model:
+                # Попытка получить информацию о модели
+                native_info = await self._get_native_model_info(model)
+                if native_info:
+                    self._models_cache[model] = ModelInfo(
+                        id=model,
+                        context_window=native_info.get("context_length", 8192),
+                        supports_tools=native_info.get("supports_tools", False),
+                    )
+            
             # Подготовка аргументов
             args = {
                 "model": model,

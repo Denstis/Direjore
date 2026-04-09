@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import json
 import logging
 import queue
 import threading
@@ -331,13 +332,31 @@ class MainWindow(tk.Tk):
                 api_key=lmstudio_config.get("api_key", "lm-studio"),
             )
             self.model_registry = ModelRegistry(self.client)
-            # Загрузка списка моделей из LM Studio
-            logger.info("Загрузка списка моделей из LM Studio")
-            self.async_bridge.run_coroutine(self.model_registry.load())
             self.tool_registry = ToolRegistry()
             logger.info("Загрузка всех инструментов")
             self.tool_registry.load_all()
             self._register_tool_handlers()
+            
+            # Проверка подключения к LM Studio и загрузка моделей
+            async def check_lmstudio_and_load_models():
+                try:
+                    logger.info("Проверка подключения к LM Studio...")
+                    models = await self.client.list_models()
+                    if models:
+                        logger.info(f"LM Studio подключено, найдено {len(models)} моделей")
+                        self.status_bar.set_connection_status(True, lmstudio_config.get("base_url", "http://localhost:1234"))
+                        # Загрузка моделей в реестр
+                        await self.model_registry.load()
+                        # Обновление списка моделей в UI
+                        self.config_panel._refresh_models()
+                    else:
+                        logger.warning("LM Studio подключено, но модели не найдены")
+                        self.status_bar.set_connection_status(False)
+                except Exception as e:
+                    logger.error(f"Ошибка подключения к LM Studio: {e}")
+                    self.status_bar.set_connection_status(False)
+            
+            self.async_bridge.run_coroutine(check_lmstudio_and_load_models())
             
         # Создание Conductor
         logger.info(f"Создание Conductor для проекта {project_id}")

@@ -4,6 +4,7 @@ Pydantic-протоколы для всех JSON-ответов LLM.
 Строгая валидация действий Дирижёра и отчётов агентов.
 """
 
+import re
 from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, Field
@@ -63,11 +64,26 @@ class QueryToolsAction(BaseModel):
 
 class DirectorResponse(BaseModel):
     """Универсальный ответ Дирижёра."""
-    action_type: DirectorActionType
-    payload: DelegateAction | AskUserAction | FinalAction | QueryToolsAction
+    action: DirectorActionType
+    role: Optional[str] = None
+    task: Optional[str] = None
+    tools: list[str] = Field(default_factory=list)
+    context_keys: list[str] = Field(default_factory=list)
+    timeout_seconds: int = 300
+    question: Optional[str] = None
+    options: list[str] = Field(default_factory=list)
+    result: Optional[str] = None
+    artifacts: dict[str, Any] = Field(default_factory=dict)
+    category: Optional[str] = None
+    search_query: Optional[str] = None
     
-    class Config:
-        use_enum_values = True
+    @property
+    def action_type(self) -> DirectorActionType:
+        return self.action
+    
+    @property
+    def payload(self):
+        return self
 
 
 # =============================================================================
@@ -200,6 +216,9 @@ def parse_director_action(json_str: str) -> DirectorResponse:
 
 def _extract_json_from_text(text: str) -> str:
     """Извлечь JSON из текста (например, из markdown блока)."""
+    if not text:
+        return ""
+    
     # Поиск JSON между ```json и ```
     match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
     if match:

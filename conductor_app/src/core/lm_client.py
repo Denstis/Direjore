@@ -55,8 +55,10 @@ class LMStudioClient:
 
     async def list_models(self) -> list[ModelInfo]:
         """Получить список доступных моделей."""
+        logger.info(f"Попытка подключения к LM Studio по адресу: {self.base_url}/v1/models")
         try:
             response = await self.openai_client.models.list()
+            logger.info(f"Успешно получено {len(response.data)} моделей от LM Studio")
             models = []
             for model in response.data:
                 info = ModelInfo(id=model.id)
@@ -69,16 +71,19 @@ class LMStudioClient:
             return models
         except Exception as e:
             logger.error(f"Ошибка получения списка моделей: {e}")
+            logger.error(f"Проверьте, что LM Studio Server запущен и доступен по адресу {self.base_url}")
             return []
 
     async def _get_native_model_info(self, model_id: str) -> Optional[dict]:
         """Получить расширенную информацию о модели через нативный API."""
         try:
+            logger.debug(f"Запрос нативной информации о модели {model_id} по адресу {self.base_url}/api/v1/models/{model_id}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.base_url}/api/v1/models/{model_id}",
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
+                    logger.debug(f"Статус ответа нативного API: {response.status}")
                     if response.status == 200:
                         return await response.json()
         except Exception as e:

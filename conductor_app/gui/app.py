@@ -328,6 +328,8 @@ class MainWindow(tk.Tk):
                 api_key=lmstudio_config.get("api_key", "lm-studio"),
             )
             self.model_registry = ModelRegistry(self.client)
+            # Загрузка списка моделей из LM Studio
+            self.async_bridge.run_coroutine(self.model_registry.load())
             self.tool_registry = ToolRegistry()
             self.tool_registry.load_all()
             self._register_tool_handlers()

@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from src.core.platform_utils import safe_join
+from src.core.platform_utils import safe_path_join as safe_join
 
 logger = logging.getLogger(__name__)
 

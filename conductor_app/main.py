@@ -19,8 +19,17 @@ def main():
     """Точка входа приложения."""
     import logging
     
+    # Проверка флага debug
+    debug_mode = "--debug" in sys.argv or "-d" in sys.argv
+    
+    if debug_mode:
+        log_level = logging.DEBUG
+        print("🔍 Запуск в режиме отладки (debug mode)")
+    else:
+        log_level = logging.INFO
+    
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
             logging.FileHandler(project_root / "conductor.log", encoding="utf-8"),
@@ -31,8 +40,17 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("🎭 Запуск Дирижёра...")
     
+    if debug_mode:
+        logger.debug("Режим отладки включён")
+        logger.debug(f"Аргументы командной строки: {sys.argv}")
+        logger.debug(f"Корень проекта: {project_root}")
+    
     try:
         app = MainWindow()
+        
+        if debug_mode:
+            logger.debug("Главное окно создано")
+        
         app.mainloop()
     except KeyboardInterrupt:
         logger.info("Остановлено пользователем")

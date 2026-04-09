@@ -437,7 +437,6 @@ class MainWindow(tk.Tk):
             self.tool_registry = ToolRegistry()
             logger.info("Загрузка всех инструментов")
             self.tool_registry.load_all()
-            self._register_tool_handlers()
             
             # Проверка подключения к LM Studio и загрузка моделей
             async def check_lmstudio_and_load_models():
@@ -472,6 +471,9 @@ class MainWindow(tk.Tk):
         
         # Memory manager
         self.memory_manager = MemoryManager(self.current_project_path)
+        
+        # Регистрация хендлеров инструментов (после создания memory_manager)
+        self._register_tool_handlers()
         
         # Инициализация Conductor
         async def init():

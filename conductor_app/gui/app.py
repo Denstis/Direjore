@@ -73,9 +73,12 @@ class AsyncBridge:
         """Обработка события из очереди."""
         event_type = event.get("type")
         
+        logger.debug(f"Обработка события GUI: {event_type}, данные: {event}")
+
         if event_type == "stage_changed":
             self.root.event_generate("<<StageChanged>>", data=event)
         elif event_type == "ask_user":
+            logger.info(f"Событие ask_user получено: question={event.get('question', 'N/A')[:50] if event.get('question') else 'пустой'}")
             self.root.event_generate("<<AskUser>>", data=event)
         elif event_type == "delegated":
             self.root.event_generate("<<Delegated>>", data=event)
@@ -214,10 +217,22 @@ class MainWindow(tk.Tk):
 
     def _on_ask_user(self, event) -> None:
         """Запрос уточнения у пользователя."""
-        data = getattr(event, 'data', {})
-        question = data.get('question', '')
-        options = data.get('options', [])
-        self.chat_panel.show_question(question, options)
+        try:
+            # Попытка получить данные из атрибута data
+            data = getattr(event, 'data', {})
+            if not data:
+                # Альтернативная попытка получить данные
+                data = {}
+            question = data.get('question', '')
+            options = data.get('options', [])
+            
+            logger.info(f"Получен вопрос от пользователя: {question[:50] if question else 'пустой'}...")
+            logger.debug(f"Опции: {options}")
+            
+            self.chat_panel.show_question(question, options)
+        except Exception as e:
+            logger.error(f"Ошибка при обработке вопроса пользователю: {e}", exc_info=True)
+            self.chat_panel.add_message("error", f"❌ Ошибка обработки вопроса: {e}")
 
     def _on_delegated(self, event) -> None:
         """Делегирование задачи."""

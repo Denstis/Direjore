@@ -81,32 +81,27 @@ class LMStudioClient:
             logger.error(f"Проверьте, что LM Studio Server запущен и доступен по адресу {self.base_url}")
             return []
 
-    async def _get_native_model_info(self, model_id: str) -> Optional[dict]:
-        """Получить расширенную информацию о модели через нативный API."""
+    async def check_loaded_model(self, model_id: str) -> bool:
+        """Проверить, загружена ли модель в LM Studio."""
         try:
-            logger.debug(f"Запрос нативной информации о модели {model_id} по адресу {self.base_url}/api/v1/models/{model_id}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{self.base_url}/api/v1/models/{model_id}",
+                    f"{self.base_url}/v1/models",
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
-                    logger.debug(f"Статус ответа нативного API: {response.status}")
                     if response.status == 200:
                         data = await response.json()
-                        # LM Studio может возвращать данные в разных форматах
-                        # Проверяем наличие ключей для определения поддержки tools
-                        result = {}
-                        if "context_length" in data:
-                            result["context_length"] = data["context_length"]
-                        # Проверяем поддержку tools по наличию capabilities или других признаков
-                        if "capabilities" in data:
-                            caps = data["capabilities"]
-                            if isinstance(caps, dict):
-                                result["supports_tools"] = caps.get("tools", False)
-                                result["supports_parallel_tools"] = caps.get("parallel_tool_calls", False)
-                        return result if result else data
+                        loaded_ids = [m["id"] for m in data.get("data", [])]
+                        return model_id in loaded_ids
         except Exception as e:
-            logger.debug(f"Не удалось получить нативную инфо о модели {model_id}: {e}")
+            logger.debug(f"Не удалось проверить загруженную модель {model_id}: {e}")
+        return False
+
+    async def _get_native_model_info(self, model_id: str) -> Optional[dict]:
+        """Получить расширенную информацию о модели через нативный API."""
+        # LM Studio не поддерживает /api/v1/models/{model_id} endpoint
+        # Используем только кэш из models.json и list_models
+        logger.debug(f"Пропуск запроса нативной информации для {model_id} (endpoint не поддерживается)")
         return None
 
     async def chat_completion(
@@ -141,15 +136,18 @@ class LMStudioClient:
         """
         try:
             # Проверка наличия загруженной модели в LM Studio
-            if model not in self._models_cache and model:
-                # Попытка получить информацию о модели
-                native_info = await self._get_native_model_info(model)
-                if native_info:
-                    self._models_cache[model] = ModelInfo(
-                        id=model,
-                        context_window=native_info.get("context_length", 8192),
-                        supports_tools=native_info.get("supports_tools", False),
-                    )
+            logger.debug(f"Проверка доступности модели {model} в LM Studio")
+            available_models = await self.list_models()
+            available_ids = [m.id for m in available_models]
+            
+            if model not in available_ids:
+                error_msg = (
+                    f"Модель '{model}' не найдена в списке доступных моделей LM Studio. "
+                    f"Доступные модели: {', '.join(available_ids)}. "
+                    f"Пожалуйста, загрузите модель в LM Studio через интерфейс (Ctrl+L) или выберите другую модель."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Подготовка аргументов
             args = {
@@ -200,6 +198,10 @@ class LMStudioClient:
                     logger.debug("Ответ получен (информация о использовании токенов недоступна)")
                 return response
                 
+        except ValueError as e:
+            # Пробрасываем ошибки валидации дальше
+            logger.error(f"Ошибка валидации модели: {e}")
+            raise
         except Exception as e:
             logger.error(f"Ошибка chat_completion: {e}")
             raise

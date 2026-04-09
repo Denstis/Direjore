@@ -1,0 +1,295 @@
+"""
+Conductor — главный оркестратор системы.
+
+Цикл: анализ → план → утверждение → делегирование → проверка → коррекция/финал
+"""
+
+import asyncio
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any, AsyncGenerator, Optional
+
+import yaml
+
+from ..core.lm_client import LMStudioClient
+from ..core.model_registry import ModelRegistry
+from ..core.tool_registry import ToolRegistry
+from .protocol import (
+    DirectorActionType,
+    DelegateAction,
+    AskUserAction,
+    FinalAction,
+    Plan,
+    PlanStep,
+    ProjectState,
+    ProjectStage,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class Conductor:
+    """Главный оркестратор многоагентной системы."""
+
+    def __init__(
+        self,
+        client: LMStudioClient,
+        model_registry: ModelRegistry,
+        tool_registry: ToolRegistry,
+        project_id: str,
+        project_root: Path,
+    ):
+        self.client = client
+        self.model_registry = model_registry
+        self.tool_registry = tool_registry
+        self.project_id = project_id
+        self.project_root = project_root
+        self.project_path = project_root / project_id
+        
+        # Состояние
+        self.state: Optional[ProjectState] = None
+        self.iteration = 0
+        self.max_iterations = 10
+        
+        # Флаг прерывания
+        self.cancel_flag = False
+        
+        # Загрузка конфигурации Дирижёра
+        self.role_config = self._load_role_config()
+
+    def _load_role_config(self) -> dict:
+        """Загрузить конфигурацию роли Дирижёра из YAML."""
+        roles_dir = Path(__file__).parent.parent.parent / "config" / "roles"
+        director_yaml = roles_dir / "director.yaml"
+        
+        if not director_yaml.exists():
+            logger.warning("Конфигурация director.yaml не найдена")
+            return {}
+            
+        with open(director_yaml, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+
+    async def initialize(self) -> None:
+        """Инициализация проекта и загрузка состояния."""
+        # Создание папок проекта если не существуют
+        self.project_path.mkdir(parents=True, exist_ok=True)
+        (self.project_path / "workspace").mkdir(exist_ok=True)
+        (self.project_path / "memory").mkdir(exist_ok=True)
+        (self.project_path / "logs").mkdir(exist_ok=True)
+        
+        # Загрузка или создание state.json
+        state_file = self.project_path / "state.json"
+        if state_file.exists():
+            with open(state_file, "r", encoding="utf-8") as f:
+                state_data = json.load(f)
+            self.state = ProjectState(**state_data)
+            logger.info(f"Загружено состояние проекта {self.project_id}")
+        else:
+            self.state = ProjectState(
+                stage=ProjectStage.IDLE,
+                created_at=datetime.now().isoformat(),
+                updated_at=datetime.now().isoformat(),
+            )
+            await self._save_state()
+            logger.info(f"Создано новое состояние проекта {self.project_id}")
+
+    async def _save_state(self) -> None:
+        """Атомарное сохранение состояния."""
+        if not self.state:
+            return
+            
+        state_file = self.project_path / "state.json"
+        state_data = self.state.model_dump(mode="json")
+        state_data["updated_at"] = datetime.now().isoformat()
+        
+        # Атомарная запись: temp → rename
+        temp_file = state_file.with_suffix(".tmp")
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(state_data, f, indent=2, ensure_ascii=False)
+        temp_file.rename(state_file)
+
+    async def process_request(self, user_message: str) -> AsyncGenerator[dict, None]:
+        """
+        Обработка запроса пользователя.
+        
+        Args:
+            user_message: Сообщение от пользователя
+            
+        Yields:
+            События для GUI (статусы, вопросы, результаты)
+        """
+        if self.cancel_flag:
+            yield {"type": "cancelled", "message": "Операция прервана"}
+            return
+            
+        self.iteration = 0
+        
+        try:
+            # Переключение в стадию планирования
+            self.state.stage = ProjectStage.PLANNING
+            await self._save_state()
+            yield {"type": "stage_changed", "stage": "planning"}
+            
+            # Цикл выполнения
+            while self.iteration < self.max_iterations and not self.cancel_flag:
+                self.iteration += 1
+                logger.info(f"Итерация {self.iteration}/{self.max_iterations}")
+                
+                # Анализ и выбор действия
+                action = await self._analyze_and_decide(user_message)
+                
+                if action.action_type == DirectorActionType.ASK_USER:
+                    # Запрос уточнения у пользователя
+                    self.state.stage = ProjectStage.WAITING_USER
+                    await self._save_state()
+                    yield {
+                        "type": "ask_user",
+                        "question": action.payload.question,
+                        "options": action.payload.options,
+                    }
+                    # Ожидание ответа пользователя (возврат управления GUI)
+                    return
+                    
+                elif action.action_type == DirectorActionType.DELEGATE:
+                    # Делегирование исполнителю
+                    self.state.stage = ProjectStage.EXECUTING
+                    self.state.active_role = action.payload.role
+                    await self._save_state()
+                    
+                    yield {
+                        "type": "delegated",
+                        "role": action.payload.role,
+                        "task": action.payload.task,
+                    }
+                    
+                    # Выполнение агентом (Worker)
+                    from ..agents.worker import Worker
+                    
+                    worker = Worker(
+                        role_name=action.payload.role,
+                        task=action.payload.task,
+                        tools=action.payload.tools,
+                        context_keys=action.payload.context_keys,
+                        conductor=self,
+                    )
+                    
+                    async for event in worker.execute():
+                        yield event
+                        
+                    # Проверка результата
+                    if event.get("type") == "agent_done" and event.get("success"):
+                        # Переход к следующему шагу или финал
+                        pass
+                    else:
+                        # Ошибка или требуется коррекция
+                        yield {"type": "needs_correction", "error": event.get("error")}
+                        
+                elif action.action_type == DirectorActionType.FINAL:
+                    # Завершение
+                    self.state.stage = ProjectStage.DONE
+                    await self._save_state()
+                    
+                    yield {
+                        "type": "final",
+                        "result": action.payload.result,
+                        "artifacts": action.payload.artifacts,
+                    }
+                    return
+                    
+            # Превышено количество итераций
+            self.state.stage = ProjectStage.ERROR
+            self.state.last_error = "Превышен лимит итераций"
+            await self._save_state()
+            yield {"type": "error", "message": "Превышен лимит итераций"}
+            
+        except Exception as e:
+            logger.error(f"Ошибка в процессе выполнения: {e}", exc_info=True)
+            self.state.stage = ProjectStage.ERROR
+            self.state.last_error = str(e)
+            await self._save_state()
+            yield {"type": "error", "message": str(e)}
+
+    async def _analyze_and_decide(self, user_message: str) -> Any:
+        """
+        Анализ запроса и выбор действия.
+        
+        Returns:
+            DirectorResponse с выбранным действием
+        """
+        # Выбор модели для Дирижёра
+        model_id = self.model_registry.select_for_role(self.role_config)
+        if not model_id:
+            raise ValueError("Не удалось выбрать модель для Дирижёра")
+            
+        # Построение контекста
+        system_prompt = self.role_config.get("system_prompt", "")
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Запрос пользователя: {user_message}"},
+        ]
+        
+        # Добавление контекста проекта
+        memory_context = await self._get_project_context()
+        if memory_context:
+            messages.insert(
+                1,
+                {"role": "user", "content": f"Контекст проекта:\n{json.dumps(memory_context, ensure_ascii=False, indent=2)}"}
+            )
+        
+        # Вызов LLM
+        response = await self.client.chat_completion(
+            model=model_id,
+            messages=messages,
+            temperature=self.role_config.get("temperature", 0.7),
+            max_tokens=self.role_config.get("max_tokens", 1024),
+        )
+        
+        # Парсинг ответа
+        raw_content = response.choices[0].message.content
+        
+        # Попытка извлечь JSON
+        json_str = self._extract_json(raw_content)
+        
+        from .protocol import parse_director_action
+        director_response = parse_director_action(json_str)
+        
+        # Логирование
+        log_file = self.project_path / "logs" / "director_calls.log"
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"\n=== Iteration {self.iteration} ===\n")
+            f.write(f"Request: {user_message}\n")
+            f.write(f"Response: {raw_content}\n")
+            f.write(f"Parsed: {director_response.model_dump_json()}\n")
+            
+        return director_response
+
+    def _extract_json(self, text: str) -> str:
+        """Извлечение JSON из текста ответа LLM."""
+        # Попытка найти JSON между { и }
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        
+        if start != -1 and end > start:
+            return text[start:end]
+            
+        return text.strip()
+
+    async def _get_project_context(self) -> dict:
+        """Получить контекст проекта из памяти."""
+        memory_file = self.project_path / "memory" / "project.json"
+        if memory_file.exists():
+            with open(memory_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return {}
+
+    def cancel(self) -> None:
+        """Установка флага прерывания."""
+        self.cancel_flag = True
+        logger.info("Установлен флаг прерывания")
+
+    def reset_cancel(self) -> None:
+        """Сброс флага прерывания."""
+        self.cancel_flag = False

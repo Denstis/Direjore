@@ -1,0 +1,98 @@
+[
+  {
+    "name": "fetch_url",
+    "description": "HTTP GET request to fetch URL content (documentation, API, pages).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL to request"
+        },
+        "method": {
+          "type": "string",
+          "description": "HTTP method",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE"
+          ],
+          "default": "GET"
+        },
+        "headers": {
+          "type": "object",
+          "description": "HTTP headers",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {
+          "type": "string",
+          "description": "Request body (for POST/PUT)"
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Timeout in seconds",
+          "default": 30
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "handler": "network_ops.fetch_url",
+    "category": "network"
+  },
+  {
+    "name": "search_web",
+    "description": "Search the internet via DuckDuckGo HTML (no API key required). Returns top results.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "num_results": {
+          "type": "integer",
+          "description": "Number of results",
+          "default": 5
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "handler": "network_ops.search_web",
+    "category": "network"
+  },
+  {
+    "name": "browser_snapshot",
+    "description": "Get text content of a web page via headless browser (if available) or simple fetch.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Page URL"
+        },
+        "wait_seconds": {
+          "type": "number",
+          "description": "Wait time for JS loading (if supported)",
+          "default": 2.0
+        },
+        "screenshot": {
+          "type": "boolean",
+          "description": "Take a screenshot (saves to workspace/screenshots)",
+          "default": false
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "handler": "network_ops.browser_snapshot",
+    "category": "network"
+  }
+]

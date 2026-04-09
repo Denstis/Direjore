@@ -1,0 +1,32 @@
+{
+  "models": [
+    {
+      "id": "qwen2.5-7b-instruct",
+      "context_window": 32768,
+      "supports_tools": true,
+      "supports_parallel_tools": false,
+      "quantization": "Q4_K_M",
+      "notes": "Основная модель для большинства задач"
+    },
+    {
+      "id": "qwen2.5-coder-7b",
+      "context_window": 32768,
+      "supports_tools": true,
+      "supports_parallel_tools": false,
+      "quantization": "Q4_K_M",
+      "notes": "Специализированная модель для кодинга"
+    },
+    {
+      "id": "llama-3.1-8b-instruct",
+      "context_window": 8192,
+      "supports_tools": false,
+      "supports_parallel_tools": false,
+      "quantization": "Q4_K_M",
+      "notes": "Резервная модель, без поддержки tools"
+    }
+  ],
+  "overrides": {
+    "context_window": {},
+    "tool_support": {}
+  }
+}

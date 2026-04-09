@@ -1,0 +1,156 @@
+[
+  {
+    "name": "read_file",
+    "description": "Read file contents by specified path. Works only within the project workspace.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the file in the project workspace"
+        },
+        "max_lines": {
+          "type": "integer",
+          "description": "Maximum number of lines to read (0 = unlimited)",
+          "default": 0
+        }
+      },
+      "required": ["path"]
+    },
+    "handler": "file_ops.read_file",
+    "category": "file"
+  },
+  {
+    "name": "write_file",
+    "description": "Create a new file or completely overwrite an existing one. Path must be within the project workspace.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the file in the project workspace"
+        },
+        "content": {
+          "type": "string",
+          "description": "Content to write to the file"
+        },
+        "encoding": {
+          "type": "string",
+          "description": "File encoding",
+          "enum": ["utf-8", "latin-1"],
+          "default": "utf-8"
+        }
+      },
+      "required": ["path", "content"]
+    },
+    "handler": "file_ops.write_file",
+    "category": "file"
+  },
+  {
+    "name": "edit_file",
+    "description": "Point editing of a file: find and replace text or insert at a specified position.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the file in the project workspace"
+        },
+        "old_text": {
+          "type": "string",
+          "description": "Text to search for (first occurrence will be replaced)"
+        },
+        "new_text": {
+          "type": "string",
+          "description": "Replacement text"
+        },
+        "insert_line": {
+          "type": "integer",
+          "description": "Line number for insertion (if not using old_text/new_text)"
+        },
+        "insert_text": {
+          "type": "string",
+          "description": "Text to insert at the specified line"
+        }
+      },
+      "required": ["path"]
+    },
+    "handler": "file_ops.edit_file",
+    "category": "file"
+  },
+  {
+    "name": "list_files",
+    "description": "Get the structure of files and folders in the specified project directory.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the directory (defaults to workspace root)",
+          "default": "."
+        },
+        "recursive": {
+          "type": "boolean",
+          "description": "Recursive traversal of subdirectories",
+          "default": false
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Glob pattern for filtering files (e.g., '*.py')",
+          "default": "*"
+        }
+      },
+      "required": []
+    },
+    "handler": "file_ops.list_files",
+    "category": "file"
+  },
+  {
+    "name": "search_code",
+    "description": "Search file contents using regular expressions.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Regular expression for search"
+        },
+        "path": {
+          "type": "string",
+          "description": "Directory to search (defaults to entire workspace)",
+          "default": "."
+        },
+        "file_pattern": {
+          "type": "string",
+          "description": "Filter by filename (glob)",
+          "default": "*"
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of results",
+          "default": 50
+        }
+      },
+      "required": ["pattern"]
+    },
+    "handler": "file_ops.search_code",
+    "category": "file"
+  },
+  {
+    "name": "delete_file",
+    "description": "Delete a file from the project workspace. Does not support directory deletion.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the file to delete"
+        }
+      },
+      "required": ["path"]
+    },
+    "handler": "file_ops.delete_file",
+    "category": "file"
+  }
+]
+

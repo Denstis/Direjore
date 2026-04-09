@@ -87,7 +87,19 @@ class LMStudioClient:
                 ) as response:
                     logger.debug(f"Статус ответа нативного API: {response.status}")
                     if response.status == 200:
-                        return await response.json()
+                        data = await response.json()
+                        # LM Studio может возвращать данные в разных форматах
+                        # Проверяем наличие ключей для определения поддержки tools
+                        result = {}
+                        if "context_length" in data:
+                            result["context_length"] = data["context_length"]
+                        # Проверяем поддержку tools по наличию capabilities или других признаков
+                        if "capabilities" in data:
+                            caps = data["capabilities"]
+                            if isinstance(caps, dict):
+                                result["supports_tools"] = caps.get("tools", False)
+                                result["supports_parallel_tools"] = caps.get("parallel_tool_calls", False)
+                        return result if result else data
         except Exception as e:
             logger.debug(f"Не удалось получить нативную инфо о модели {model_id}: {e}")
         return None

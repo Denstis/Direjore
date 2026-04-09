@@ -174,6 +174,7 @@ def parse_director_action(json_str: str) -> DirectorResponse:
         ValidationError при невалидном JSON
     """
     from pydantic import ValidationError
+    import re
     
     try:
         # Попытка прямого парсинга
@@ -181,7 +182,37 @@ def parse_director_action(json_str: str) -> DirectorResponse:
         return data
     except ValidationError as e:
         # Попытка исправить частые ошибки LLM
+        # Если ошибка в enum (action_type), пробуем нормализовать значение
+        error_str = str(e)
+        
+        # Извлекаем JSON из текста если он обёрнут в markdown или другой текст
+        json_str = _extract_json_from_text(json_str)
+        
+        try:
+            # Повторная попытка после извлечения JSON
+            data = DirectorResponse.model_validate_json(json_str)
+            return data
+        except ValidationError:
+            pass
+        
         raise ValueError(f"Невалидный JSON от Дирижёра: {e}")
+
+
+def _extract_json_from_text(text: str) -> str:
+    """Извлечь JSON из текста (например, из markdown блока)."""
+    # Поиск JSON между ```json и ```
+    match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+    if match:
+        return match.group(1)
+    
+    # Поиск первого { и последнего }
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    
+    if start != -1 and end > start:
+        return text[start:end]
+    
+    return text.strip()
 
 
 def parse_agent_report(json_str: str) -> AgentReport:

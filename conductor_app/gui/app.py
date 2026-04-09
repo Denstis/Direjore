@@ -99,8 +99,8 @@ class MainWindow(tk.Tk):
         self.title("🎭 Дирижёр — Multi-Agent System")
         self.geometry("1400x900")
         
-        # Настройка стилей
-        self.option_add("*Font", "Segoe UI 10")
+        # Настройка стилей (не применяется к Menu в ttkbootstrap)
+        # self.option_add("*Font", "Segoe UI 10")
         
         # Инициализация компонентов
         self.async_bridge = AsyncBridge(self)

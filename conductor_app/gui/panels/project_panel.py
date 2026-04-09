@@ -7,8 +7,7 @@ import tkinter as tk
 from pathlib import Path
 from typing import Optional
 
-import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+from tkinter import ttk
 
 
 class ProjectPanel:
@@ -47,7 +46,6 @@ class ProjectPanel:
         self.progress = ttk.Progressbar(
             stage_frame,
             mode="determinate",
-            bootstrp=INFO,
         )
         self.progress.pack(fill=tk.X, pady=(5, 0))
         
@@ -82,14 +80,12 @@ class ProjectPanel:
             btn_frame,
             text="🔄 Обновить",
             command=self.refresh,
-            bootstyle=OUTLINE,
         ).pack(side=tk.LEFT, padx=2)
         
         ttk.Button(
             btn_frame,
             text="📤 Экспорт",
             command=self._export_project,
-            bootstyle=OUTLINE,
         ).pack(side=tk.LEFT, padx=2)
 
     def update_stage(self, stage: str) -> None:

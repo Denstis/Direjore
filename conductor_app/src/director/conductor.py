@@ -73,11 +73,13 @@ class Conductor:
 
     async def initialize(self) -> None:
         """Инициализация проекта и загрузка состояния."""
+        logger.info(f"Инициализация проекта {self.project_id}")
         # Создание папок проекта если не существуют
         self.project_path.mkdir(parents=True, exist_ok=True)
         (self.project_path / "workspace").mkdir(exist_ok=True)
         (self.project_path / "memory").mkdir(exist_ok=True)
         (self.project_path / "logs").mkdir(exist_ok=True)
+        logger.debug(f"Созданы директории проекта в {self.project_path}")
         
         # Загрузка или создание state.json
         state_file = self.project_path / "state.json"
@@ -86,6 +88,7 @@ class Conductor:
                 state_data = json.load(f)
             self.state = ProjectState(**state_data)
             logger.info(f"Загружено состояние проекта {self.project_id}")
+            logger.debug(f"Состояние: stage={self.state.stage}, created_at={self.state.created_at}")
         else:
             self.state = ProjectState(
                 stage=ProjectStage.IDLE,
@@ -120,7 +123,10 @@ class Conductor:
         Yields:
             События для GUI (статусы, вопросы, результаты)
         """
+        logger.info(f"Получен запрос от пользователя: {user_message[:100]}...")
+        
         if self.cancel_flag:
+            logger.warning("Операция прервана флагом cancel_flag")
             yield {"type": "cancelled", "message": "Операция прервана"}
             return
             
@@ -130,6 +136,7 @@ class Conductor:
             # Переключение в стадию планирования
             self.state.stage = ProjectStage.PLANNING
             await self._save_state()
+            logger.debug(f"Стадия изменена на: planning")
             yield {"type": "stage_changed", "stage": "planning"}
             
             # Цикл выполнения
@@ -138,7 +145,9 @@ class Conductor:
                 logger.info(f"Итерация {self.iteration}/{self.max_iterations}")
                 
                 # Анализ и выбор действия
+                logger.debug(f"Начало анализа и выбора действия на итерации {self.iteration}")
                 action = await self._analyze_and_decide(user_message)
+                logger.debug(f"Выбрано действие: {action.action_type}")
                 
                 if action.action_type == DirectorActionType.ASK_USER:
                     # Запрос уточнения у пользователя
@@ -218,11 +227,16 @@ class Conductor:
         Returns:
             DirectorResponse с выбранным действием
         """
+        logger.debug(f"Начало анализа запроса для выбора действия")
+        
         # Выбор модели для Дирижёра
         model_id = self.model_registry.select_for_role(self.role_config)
         if not model_id:
+            logger.error("Не удалось выбрать модель для Дирижёра")
             raise ValueError("Не удалось выбрать модель для Дирижёра")
-            
+        
+        logger.info(f"Выбрана модель для Дирижёра: {model_id}")
+        
         # Построение контекста
         system_prompt = self.role_config.get("system_prompt", "")
         
@@ -234,12 +248,16 @@ class Conductor:
         # Добавление контекста проекта
         memory_context = await self._get_project_context()
         if memory_context:
+            logger.debug(f"Добавлен контекст проекта: {len(json.dumps(memory_context))} байт")
             messages.insert(
                 1,
                 {"role": "user", "content": f"Контекст проекта:\n{json.dumps(memory_context, ensure_ascii=False, indent=2)}"}
             )
+        else:
+            logger.debug("Контекст проекта пуст")
         
         # Вызов LLM
+        logger.info(f"Вызов LLM для анализа запроса (модель: {model_id})")
         response = await self.client.chat_completion(
             model=model_id,
             messages=messages,
@@ -249,12 +267,15 @@ class Conductor:
         
         # Парсинг ответа
         raw_content = response.choices[0].message.content
+        logger.debug(f"Получен ответ от LLM длиной {len(raw_content)} символов")
         
         # Попытка извлечь JSON
         json_str = self._extract_json(raw_content)
         
         from .protocol import parse_director_action
         director_response = parse_director_action(json_str)
+        
+        logger.info(f"Действие успешно распарсено: {director_response.action_type}")
         
         # Логирование
         log_file = self.project_path / "logs" / "director_calls.log"

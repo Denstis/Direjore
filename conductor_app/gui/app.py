@@ -316,12 +316,15 @@ class MainWindow(tk.Tk):
 
     def _initialize_project(self, project_id: str) -> None:
         """Инициализация проекта."""
+        logger.info(f"Инициализация проекта: {project_id}")
+        
         self.current_project_id = project_id
         projects_root = Path(self.settings.get("project_root", "./projects"))
         self.current_project_path = projects_root / project_id
         
         # Инициализация компонентов если ещё не созданы
         if not self.client:
+            logger.info("Инициализация LM Studio клиента")
             lmstudio_config = self.settings.get("lmstudio", {})
             self.client = LMStudioClient(
                 base_url=lmstudio_config.get("base_url", "http://localhost:1234"),
@@ -329,12 +332,15 @@ class MainWindow(tk.Tk):
             )
             self.model_registry = ModelRegistry(self.client)
             # Загрузка списка моделей из LM Studio
+            logger.info("Загрузка списка моделей из LM Studio")
             self.async_bridge.run_coroutine(self.model_registry.load())
             self.tool_registry = ToolRegistry()
+            logger.info("Загрузка всех инструментов")
             self.tool_registry.load_all()
             self._register_tool_handlers()
             
         # Создание Conductor
+        logger.info(f"Создание Conductor для проекта {project_id}")
         self.conductor = Conductor(
             client=self.client,
             model_registry=self.model_registry,
@@ -365,10 +371,14 @@ class MainWindow(tk.Tk):
 
     def send_message(self, message: str) -> None:
         """Отправка сообщения пользователем."""
+        logger.info(f"Отправка сообщения пользователем: {message[:50]}...")
+        
         self.chat_panel.add_message("user", message)
         
         async def process():
+            logger.debug(f"Начало обработки запроса Conductor")
             async for event in self.conductor.process_request(message):
+                logger.debug(f"Получено событие от Conductor: {event.get('type')}")
                 self.async_bridge.gui_queue.put(event)
                 
         future = self.async_bridge.run_coroutine(process())

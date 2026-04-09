@@ -5,11 +5,14 @@ ConfigPanel — панель конфигурации с табами.
 """
 
 import json
+import logging
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog
 from pathlib import Path
 from typing import Optional
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigPanel:
@@ -231,25 +234,36 @@ class ConfigPanel:
         
     def _refresh_models(self):
         """Обновление списка моделей."""
+        logger.info("Пользователь нажал кнопку обновления списка моделей")
+        
         # Очистка treeview
         for item in self.models_tree.get_children():
             self.models_tree.delete(item)
             
         if self.main_window.model_registry:
+            logger.debug("Получение списка моделей из реестра")
             models = self.main_window.model_registry.list_models()
+            logger.info(f"Найдено {len(models)} моделей в реестре")
+            
             for model in models:
-                model_id = model.get("id", "unknown")
-                context = model.get("context_window", "?")
-                tools = "✅" if model.get("tool_support", False) else "❌"
-                quant = model.get("quantization", "N/A")
+                # ModelInfo - это dataclass, используем атрибуты напрямую
+                model_id = model.id
+                context = model.context_window
+                tools = "✅" if model.supports_tools else "❌"
+                quant = model.quantization or "N/A"
                 
+                logger.debug(f"Добавление модели в список: {model_id}, контекст={context}, tools={tools}")
                 self.models_tree.insert("", tk.END, values=(model_id, f"{context}k", tools, quant))
                 
                 # Добавление в combobox
                 current = self.director_model_combo.cget("values")
                 if model_id not in current:
+                    logger.debug(f"Добавление модели {model_id} в выпадающие списки")
                     self.director_model_combo.configure(values=list(current) + [model_id])
                     self.worker_model_combo.configure(values=list(current) + [model_id])
+        else:
+            logger.warning("ModelRegistry ещё не инициализирован")
+            messagebox.showwarning("Предупреждение", "Сначала создайте или откройте проект")
                     
     def _refresh_roles(self):
         """Обновление списка ролей."""

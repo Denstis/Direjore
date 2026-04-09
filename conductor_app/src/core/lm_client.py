@@ -57,6 +57,7 @@ class LMStudioClient:
         """Получить список доступных моделей."""
         logger.info(f"Попытка подключения к LM Studio по адресу: {self.base_url}/v1/models")
         try:
+            logger.debug(f"Инициализация запроса к API LM Studio")
             response = await self.openai_client.models.list()
             logger.info(f"Успешно получено {len(response.data)} моделей от LM Studio")
             models = []
@@ -68,6 +69,7 @@ class LMStudioClient:
                     info.context_window = native_info.get("context_length", info.context_window)
                 models.append(info)
                 self._models_cache[model.id] = info
+                logger.debug(f"Добавлена модель в кэш: {model.id}")
             return models
         except Exception as e:
             logger.error(f"Ошибка получения списка моделей: {e}")
@@ -149,9 +151,13 @@ class LMStudioClient:
             # Добавляем дополнительные аргументы
             args.update(kwargs)
             
-            logger.debug(f"Вызов chat_completion для модели {model}, tools={len(tools) if tools else 0}")
+            logger.info(f"Вызов chat_completion для модели {model}, tools={len(tools) if tools else 0}, stream={stream}")
+            logger.debug(f"Параметры запроса: temperature={temperature}, max_tokens={max_tokens}, top_p={top_p}")
+            logger.debug(f"Количество сообщений в запросе: {len(messages)}")
             
             response = await self.openai_client.chat.completions.create(**args)
+            
+            logger.debug(f"Получен ответ от API для модели {model}")
             
             if stream:
                 return response  # Async generator
@@ -162,6 +168,8 @@ class LMStudioClient:
                         f"Токены: input={response.usage.prompt_tokens}, "
                         f"output={response.usage.completion_tokens}"
                     )
+                else:
+                    logger.debug("Ответ получен (информация о использовании токенов недоступна)")
                 return response
                 
         except Exception as e:

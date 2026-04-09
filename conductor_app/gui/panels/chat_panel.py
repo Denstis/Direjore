@@ -5,9 +5,12 @@ ChatPanel — панель диалога с агентом.
 """
 
 import json
+import logging
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
 from typing import Callable, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class CodeEditorWithMenu(scrolledtext.ScrolledText):
@@ -340,8 +343,11 @@ class ChatPanel:
         """Отправка сообщения."""
         message = self.input_text.get("1.0", tk.END).strip()
         if not message:
+            logger.debug("Пользователь попытался отправить пустое сообщение")
             return
             
+        logger.info(f"Пользователь отправил сообщение ({len(message)} символов): {message[:50]}...")
+        
         # Отправка через main window
         self.main_window.send_message(message)
         

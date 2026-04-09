@@ -2,12 +2,14 @@
 Project Panel — отображение структуры проекта, стадии, прогресса.
 """
 
-import json
+import logging
 import tkinter as tk
 from pathlib import Path
 from typing import Optional
 
 from tkinter import ttk
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectPanel:
@@ -127,27 +129,36 @@ class ProjectPanel:
 
     def refresh(self) -> None:
         """Обновление дерева файлов."""
+        logger.info("Пользователь нажал кнопку обновления проекта")
+        
         # Очистка дерева
         for item in self.tree.get_children():
             self.tree.delete(item)
             
         if not self.app.current_project_path:
+            logger.debug("Проект не выбран, обновление отменено")
             return
             
         workspace_path = self.app.current_project_path / "workspace"
+        logger.debug(f"Попытка обновления дерева для пути: {workspace_path}")
+        
         if not workspace_path.exists():
+            logger.warning(f"Папка workspace не найдена: {workspace_path}")
             return
             
         # Построение дерева
         self._build_tree(workspace_path, "")
+        logger.info("Дерево файлов проекта обновлено")
 
     def _build_tree(self, path: Path, parent_id: str) -> None:
         """Рекурсивное построение дерева."""
         try:
+            logger.debug(f"Построение дерева для директории: {path}")
             items = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name))
             
             for item in items:
                 icon = "📁" if item.is_dir() else "📄"
+                logger.debug(f"Добавление элемента: {icon} {item.name}")
                 item_id = self.tree.insert(
                     parent_id,
                     "end",
@@ -159,7 +170,7 @@ class ProjectPanel:
                     self._build_tree(item, item_id)
                     
         except Exception as e:
-            pass
+            logger.error(f"Ошибка при построении дерева файлов: {e}")
 
     def _export_project(self) -> None:
         """Экспорт проекта в ZIP."""

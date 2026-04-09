@@ -76,7 +76,10 @@ class Worker:
             # Выбор модели для роли
             model_id = self.model_registry.select_for_role(self.role_config)
             if not model_id:
+                logger.error(f"Не удалось выбрать модель для роли {self.role_name}")
                 raise ValueError(f"Не удалось выбрать модель для роли {self.role_name}")
+            
+            logger.info(f"Выбрана модель для роли {self.role_name}: {model_id}")
                 
             # Построение начального контекста
             system_prompt = self.role_config.get("system_prompt", "")
@@ -90,20 +93,26 @@ class Worker:
             if self.context_keys:
                 project_context = await self._get_project_context(self.context_keys)
                 if project_context:
+                    logger.debug(f"Добавлен контекст проекта: {len(json.dumps(project_context))} байт")
                     self.messages.insert(
                         1,
                         {"role": "user", "content": f"Контекст:\n{json.dumps(project_context, ensure_ascii=False, indent=2)}"}
                     )
+                else:
+                    logger.debug("Контекст проекта пуст")
                     
             # Получение разрешённых инструментов
             allowed_schemas = self.tool_registry.get_tools_for_openai(self.allowed_tools)
+            logger.debug(f"Разрешено инструментов: {len(allowed_schemas)}")
             
             # Цикл выполнения
             iteration = 0
             while iteration < self.max_tool_iterations:
                 iteration += 1
+                logger.debug(f"Итерация выполнения инструмента {iteration}/{self.max_tool_iterations}")
                 
                 # Вызов LLM
+                logger.info(f"Вызов LLM для роли {self.role_name} (итерация {iteration})")
                 response = await self.client.chat_completion(
                     model=model_id,
                     messages=self.messages,
@@ -113,18 +122,24 @@ class Worker:
                 )
                 
                 assistant_message = response.choices[0].message
+                logger.debug(f"Получен ответ от LLM, есть tool_calls: {bool(assistant_message.tool_calls)}")
                 self.messages.append({"role": "assistant", "content": assistant_message.content})
                 
                 # Проверка на tool_calls
                 if assistant_message.tool_calls:
+                    logger.info(f"Обнаружено {len(assistant_message.tool_calls)} tool_call(ов)")
                     # Выполнение инструментов
                     for tool_call in assistant_message.tool_calls:
                         if self.conductor.cancel_flag:
+                            logger.warning("Операция прервана флагом cancel_flag во время выполнения инструмента")
                             yield {"type": "cancelled", "message": "Операция прервана"}
                             return
                             
                         tool_name = tool_call.function.name
                         arguments = json.loads(tool_call.function.arguments)
+                        
+                        logger.info(f"Вызов инструмента: {tool_name}")
+                        logger.debug(f"Аргументы инструмента {tool_name}: {json.dumps(arguments)}")
                         
                         yield {
                             "type": "tool_call",
@@ -135,20 +150,25 @@ class Worker:
                         # Валидация аргументов
                         valid, error = self.tool_registry.validate_arguments(tool_name, arguments)
                         if not valid:
+                            logger.warning(f"Валидация аргументов не пройдена для {tool_name}: {error}")
                             result = {"error": error}
                             success = False
                         else:
                             # Выполнение инструмента
                             handler = self.tool_registry.get_handler(tool_name)
                             if not handler:
+                                logger.error(f"Handler не найден для {tool_name}")
                                 result = {"error": f"Handler не найден для {tool_name}"}
                                 success = False
                             else:
                                 try:
                                     # Handler уже имеет project_path через partial
+                                    logger.debug(f"Выполнение handler для {tool_name}")
                                     result = await handler(**arguments)
                                     success = True
+                                    logger.debug(f"Инструмент {tool_name} выполнен успешно")
                                 except Exception as e:
+                                    logger.error(f"Ошибка выполнения инструмента {tool_name}: {e}", exc_info=True)
                                     result = {"error": str(e)}
                                     success = False
                                     
@@ -161,6 +181,8 @@ class Worker:
                             error=result.get("error") if isinstance(result, dict) else None,
                         )
                         self.tool_results.append(tool_result)
+                        
+                        logger.info(f"Результат инструмента {tool_name}: {'OK' if success else 'ERROR'}")
                         
                         # Добавление в историю
                         self.messages.append({
@@ -178,6 +200,7 @@ class Worker:
                         }
                         
                 else:
+                    logger.debug("Нет tool_calls — формирование финального отчёта")
                     # Нет tool_calls — формирование финального отчёта
                     break
                     
@@ -202,6 +225,8 @@ class Worker:
 
     async def _generate_report(self, model_id: str) -> AgentReport:
         """Генерация финального отчёта через LLM."""
+        logger.info(f"Генерация финального отчёта для роли {self.role_name}")
+        
         prompt = """
 Сформируй JSON-отчёт о выполненной задаче в строгом формате:
 {
@@ -216,6 +241,7 @@ class Worker:
 """
         self.messages.append({"role": "user", "content": prompt})
         
+        logger.debug(f"Вызов LLM для генерации отчёта (модель: {model_id})")
         response = await self.client.chat_completion(
             model=model_id,
             messages=self.messages,
@@ -224,6 +250,7 @@ class Worker:
         )
         
         raw_content = response.choices[0].message.content
+        logger.debug(f"Получен ответ для отчёта длиной {len(raw_content)} символов")
         
         # Извлечение JSON
         start = raw_content.find("{")
@@ -232,7 +259,9 @@ class Worker:
         
         try:
             report = AgentReport.model_validate_json(json_str)
-        except Exception:
+            logger.info(f"Отчёт успешно распарсен: status={report.status}")
+        except Exception as e:
+            logger.warning(f"Не удалось распарсить JSON отчёта: {e}, используется fallback")
             # Fallback
             report = AgentReport(
                 status=AgentStatus.SUCCESS,

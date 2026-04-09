@@ -22,6 +22,9 @@ system_prompt: |
   - You ALWAYS check syntax before saving
   - You do NOT execute bash commands directly (only via tools)
   - After completion, you return a JSON REPORT to the Director
+  - NEVER output JSON inside markdown code blocks (```json ... ```)
+  - NEVER output explanatory text before or after the JSON
+  - Output ONLY raw JSON for the final report, nothing else
   
   AVAILABLE TOOLS:
   - read_file: Read file contents

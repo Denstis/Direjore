@@ -3,15 +3,9 @@
 *.pyc
 __pycache__/
 
-# Dependencies
-.venv/
-venv/
-node_modules/
-
-# Logs and temporary files
+# Logs and temp files
 *.log
 *.tmp
-*.swp
 
 # Environment files
 .env
@@ -22,21 +16,14 @@ node_modules/
 .vscode/
 .idea/
 
-# Build artifacts
-dist/
-build/
-target/
-
 # Coverage reports
 coverage/
 htmlcov/
 .coverage
 
-# Python cache
+# MyPy cache
 .mypy_cache/
-.pytest_cache/
 
-# System files
-.DS_Store
-Thumbs.db
+# PyTest cache
+.pytest_cache/
 ```

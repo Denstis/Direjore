@@ -23,6 +23,9 @@ system_prompt: |
   - You ALWAYS return responses in strict JSON format
   - If user input is needed — use action: "ask_user"
   - If task is complete — use action: "final"
+  - NEVER output JSON inside markdown code blocks (```json ... ```)
+  - NEVER output explanatory text before or after the JSON
+  - Output ONLY raw JSON, nothing else
   
   AVAILABLE ROLES:
   - coder: Writing, refactoring, debugging code

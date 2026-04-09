@@ -488,21 +488,28 @@ class ConfigPanel:
                 
     def _apply_changes(self):
         """Применение изменений."""
-        # Сохранение настроек моделей
-        settings = {
-            "director_model": self.director_model_var.get(),
-            "worker_model": self.worker_model_var.get(),
-        }
+        # Сохранение настроек моделей в models.json
+        director_model = self.director_model_var.get()
+        worker_model = self.worker_model_var.get()
         
-        settings_file = Path(__file__).parent.parent.parent / "config" / "settings.yaml"
-        if settings_file.exists():
-            with open(settings_file, "r", encoding="utf-8") as f:
-                current_settings = yaml.safe_load(f) or {}
-            current_settings["models"] = settings
-            with open(settings_file, "w", encoding="utf-8") as f:
-                yaml.dump(current_settings, f, default_flow_style=False, allow_unicode=True)
+        # Обновление director.yaml с выбранной моделью
+        if director_model:
+            roles_dir = Path(__file__).parent.parent.parent / "config" / "roles"
+            director_yaml = roles_dir / "director.yaml"
+            if director_yaml.exists():
+                with open(director_yaml, "r", encoding="utf-8") as f:
+                    content = yaml.safe_load(f) or {}
                 
-        messagebox.showinfo("Успех", "Настройки применены")
+                if "model_preference" not in content:
+                    content["model_preference"] = director_model
+                else:
+                    content["model_preference"] = director_model
+                    
+                with open(director_yaml, "w", encoding="utf-8") as f:
+                    yaml.dump(content, f, default_flow_style=False, allow_unicode=True)
+                logger.info(f"Обновлена модель Director на {director_model}")
+        
+        messagebox.showinfo("Успех", f"Настройки применены\nDirector: {director_model}\nWorker: {worker_model}")
         
     def show_settings_tab(self):
         """Показ таба настроек."""

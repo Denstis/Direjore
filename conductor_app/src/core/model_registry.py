@@ -117,13 +117,13 @@ class ModelRegistry:
         preferred = role_config.get("model_preference")
         
         if preferred:
-            # Проверка предпочтительной модели
+            # Проверка предпочтительной модели - ищем в загруженных моделях
             model = self.get_model(preferred)
             if model:
                 return preferred
-            logger.warning(f"Предпочтительная модель {preferred} не найдена")
+            logger.warning(f"Предпочтительная модель {preferred} не найдена в списке доступных")
         
-        # Fallback: первая модель с поддержкой tools
+        # Fallback: первая модель с поддержкой tools из доступных
         models_with_tools = self.filter_models(requires_tools=True)
         if models_with_tools:
             return models_with_tools[0].id
@@ -134,6 +134,10 @@ class ModelRegistry:
             return all_models[0].id
             
         return None
+
+    def get_available_models_list(self) -> list[str]:
+        """Вернуть список ID доступных моделей."""
+        return [m.id for m in self._models.values()]
 
     def apply_manual_override(self, model_id: str, **kwargs) -> None:
         """

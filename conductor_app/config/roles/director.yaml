@@ -52,6 +52,6 @@ allowed_actions:
   - final
   - query_tools
 
-model_preference: "qwen2.5-7b-instruct"
+model_preference: "qwen/qwen3.5-9b"
 temperature: 0.7
 max_tokens: 1024

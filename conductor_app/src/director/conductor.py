@@ -111,6 +111,11 @@ class Conductor:
         temp_file = state_file.with_suffix(".tmp")
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(state_data, f, indent=2, ensure_ascii=False)
+        
+        # На Windows rename может失败 если target существует, поэтому сначала удаляем
+        import sys
+        if sys.platform == "win32" and state_file.exists():
+            state_file.unlink()
         temp_file.rename(state_file)
 
     async def process_request(self, user_message: str) -> AsyncGenerator[dict, None]:

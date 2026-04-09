@@ -3,6 +3,8 @@ chcp 65001 >nul
 REM Conductor App - Git Update Script
 REM Обновление проекта из Git репозитория
 
+setlocal enabledelayedexpansion
+
 echo ============================================
 echo   🔄 Conductor - Обновление из Git
 echo ============================================
@@ -26,15 +28,12 @@ echo.
 REM Переход в директорию скрипта
 cd /d "%~dp0"
 
-REM Переход в папку conductor_app
-cd /d "%~dp0conductor_app"
-
-REM Проверка наличия репозитория .git
+REM Проверка наличия репозитория .git в текущей директории
 if not exist ".git" (
     echo ❌ Ошибка: Папка .git не найдена!
     echo.
     echo Это не Git-репозиторий.
-    echo Если вы клонировали проект, убедитесь, что запускаете Update.bat из корневой папки.
+    echo Запускайте Update.bat из корневой папки проекта, где находится .git
     echo Если это новая установка, используйте Run.bat вместо Update.bat.
     pause
     exit /b 1

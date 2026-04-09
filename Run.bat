@@ -58,15 +58,16 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo ============================================
-echo   🚀 Запуск приложения...
+echo   🚀 Запуск приложения (режим отладки)...
 echo ============================================
 echo.
 echo 💡 Убедитесь, что LM Studio запущен с моделью на localhost:1234
 echo 💡 Для остановки нажмите Ctrl+C
 echo.
 
-REM Запуск приложения
-python -m gui.app
+REM Запуск приложения в режиме отладки
+set CONDUCTOR_DEBUG=1
+python -m gui.app --debug
 
 REM Если приложение завершилось с ошибкой
 if %ERRORLEVEL% NEQ 0 (

@@ -1,0 +1,118 @@
+[
+  {
+    "name": "run_command",
+    "description": "Execute system command in shell (bash/sh/cmd). Works only in project context. Dangerous commands blocked (sudo, rm -rf, formatting).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Command to execute"
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory (relative to workspace)",
+          "default": "."
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Execution timeout in seconds",
+          "default": 30
+        },
+        "shell": {
+          "type": "boolean",
+          "description": "Use shell (true) or direct call (false)",
+          "default": true
+        }
+      },
+      "required": [
+        "command"
+      ]
+    },
+    "handler": "system_ops.run_command",
+    "category": "system"
+  },
+  {
+    "name": "pip_install",
+    "description": "Install Python packages via pip into the project virtual environment.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of packages to install (e.g., ['requests', 'pydantic'])"
+        },
+        "upgrade": {
+          "type": "boolean",
+          "description": "Upgrade packages if already installed",
+          "default": false
+        },
+        "requirements_file": {
+          "type": "string",
+          "description": "Path to requirements.txt (if used instead of packages)"
+        }
+      },
+      "required": []
+    },
+    "handler": "system_ops.pip_install",
+    "category": "system"
+  },
+  {
+    "name": "git_clone",
+    "description": "Clone a Git repository into the project workspace.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Git repository URL"
+        },
+        "directory": {
+          "type": "string",
+          "description": "Directory name for cloning (defaults to repo name)"
+        },
+        "branch": {
+          "type": "string",
+          "description": "Branch to clone",
+          "default": "main"
+        },
+        "depth": {
+          "type": "integer",
+          "description": "Clone depth (1 = latest commit only)",
+          "default": 1
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "handler": "system_ops.git_clone",
+    "category": "system"
+  },
+  {
+    "name": "git_command",
+    "description": "Execute a Git command in an existing project repository.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Git command without 'git' prefix (e.g., 'status', 'commit -m \"msg\"')"
+        },
+        "repo_path": {
+          "type": "string",
+          "description": "Path to repository relative to workspace",
+          "default": "."
+        }
+      },
+      "required": [
+        "command"
+      ]
+    },
+    "handler": "system_ops.git_command",
+    "category": "system"
+  }
+]

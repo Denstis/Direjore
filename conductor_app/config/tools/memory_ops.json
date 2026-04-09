@@ -1,0 +1,120 @@
+[
+  {
+    "name": "read_project_memory",
+    "description": "Read data from project memory by key. Returns stored value or null if not found.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Memory key to read"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "handler": "memory_ops.read_project_memory",
+    "category": "memory"
+  },
+  {
+    "name": "write_project_memory",
+    "description": "Write data to project memory. Stores key-value pair for future access.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Memory key"
+        },
+        "value": {
+          "type": "string",
+          "description": "Value to store (JSON string or plain text)"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ]
+    },
+    "handler": "memory_ops.write_project_memory",
+    "category": "memory"
+  },
+  {
+    "name": "delete_project_memory",
+    "description": "Delete a key from project memory.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Memory key to delete"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "handler": "memory_ops.delete_project_memory",
+    "category": "memory"
+  },
+  {
+    "name": "read_user_memory",
+    "description": "Read user preferences/settings from user memory (read-only for agents).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "User memory key"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "handler": "memory_ops.read_user_memory",
+    "category": "memory"
+  },
+  {
+    "name": "read_role_memory",
+    "description": "Read temporary role-specific memory from current session.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Role memory key"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "handler": "memory_ops.read_role_memory",
+    "category": "memory"
+  },
+  {
+    "name": "write_role_memory",
+    "description": "Write temporary data to role-specific memory (cleared after role completes).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Role memory key"
+        },
+        "value": {
+          "type": "string",
+          "description": "Value to store"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ]
+    },
+    "handler": "memory_ops.write_role_memory",
+    "category": "memory"
+  }
+]

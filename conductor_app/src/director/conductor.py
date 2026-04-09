@@ -250,19 +250,29 @@ class Conductor:
         
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Запрос пользователя: {user_message}"},
         ]
         
-        # Добавление контекста проекта
+        # Добавление контекста проекта (памяти) - КРИТИЧЕСКИ ВАЖНО
         memory_context = await self._get_project_context()
+        state_context = await self._get_state_context()
+        
+        # Объединяем контексты
+        full_context = {}
         if memory_context:
-            logger.debug(f"Добавлен контекст проекта: {len(json.dumps(memory_context))} байт")
-            messages.insert(
-                1,
-                {"role": "user", "content": f"Контекст проекта:\n{json.dumps(memory_context, ensure_ascii=False, indent=2)}"}
+            full_context["memory"] = memory_context
+        if state_context:
+            full_context["state"] = state_context
+            
+        if full_context:
+            logger.debug(f"Добавлен контекст проекта: {len(json.dumps(full_context))} байт")
+            messages.append(
+                {"role": "user", "content": f"Контекст проекта (память и состояние):\n{json.dumps(full_context, ensure_ascii=False, indent=2)}"}
             )
         else:
             logger.debug("Контекст проекта пуст")
+        
+        # Добавляем запрос пользователя
+        messages.append({"role": "user", "content": f"Запрос пользователя: {user_message}"})
         
         # Вызов LLM
         logger.info(f"Вызов LLM для анализа запроса (модель: {model_id})")
@@ -290,6 +300,7 @@ class Conductor:
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"\n=== Iteration {self.iteration} ===\n")
             f.write(f"Request: {user_message}\n")
+            f.write(f"State: stage={self.state.stage}, step={self.state.current_step}\n")
             f.write(f"Response: {raw_content}\n")
             f.write(f"Parsed: {director_response.model_dump_json()}\n")
             
@@ -313,6 +324,19 @@ class Conductor:
             with open(memory_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {}
+
+    async def _get_state_context(self) -> dict:
+        """Получить текущее состояние проекта для контекста."""
+        if not self.state:
+            return {}
+            
+        return {
+            "stage": self.state.stage.value,
+            "current_step": self.state.current_step,
+            "iteration": self.state.iteration,
+            "active_role": self.state.active_role,
+            "last_error": self.state.last_error,
+        }
 
     def cancel(self) -> None:
         """Установка флага прерывания."""

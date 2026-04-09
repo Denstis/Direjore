@@ -241,23 +241,23 @@ async def write_role_memory(project_path: Path, role_name: str, key: str, value:
         return {"error": str(e)}
 
 
-def register_memory_handlers(tool_registry, project_path: Path) -> None:
+def register_memory_handlers(tool_registry, memory_manager: "MemoryManager") -> None:
     """
     Регистрация всех memory ops handlers в реестре.
     
     Args:
         tool_registry: ToolRegistry instance
-        project_path: Путь к проекту
+        memory_manager: MemoryManager instance для доступа к памяти
     """
     from functools import partial
     
     handlers = {
-        "read_project_memory": partial(read_project_memory, project_path),
-        "write_project_memory": partial(write_project_memory, project_path),
-        "delete_project_memory": partial(delete_project_memory, project_path),
-        "read_user_memory": partial(read_user_memory, project_path),
-        "read_role_memory": partial(read_role_memory, project_path),
-        "write_role_memory": partial(write_role_memory, project_path),
+        "read_project_memory": partial(memory_manager.project_read),
+        "write_project_memory": partial(memory_manager.project_write),
+        "delete_project_memory": partial(memory_manager.project_delete),
+        "read_user_memory": partial(memory_manager.user_get),
+        "read_role_memory": partial(memory_manager.role_read),
+        "write_role_memory": partial(memory_manager.role_write),
     }
     
     for name, handler in handlers.items():

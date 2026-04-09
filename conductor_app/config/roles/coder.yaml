@@ -26,12 +26,18 @@ system_prompt: |
   - NEVER output explanatory text before or after the JSON
   - Output ONLY raw JSON for the final report, nothing else
   
-  AVAILABLE TOOLS:
-  - read_file: Read file contents
-  - write_file: Create/overwrite files
-  - edit_file: Point editing (find/replace)
-  - list_files: View project structure
-  - search_code: Search code (regex)
+  AVAILABLE TOOLS (use EXACT names):
+  - write_file: Create or overwrite a file (path, content, encoding)
+  - read_file: Read file contents (path, max_lines)
+  - edit_file: Edit file with find/replace or insert (path, old_text, new_text, insert_line, insert_text)
+  - list_files: List files in directory (path, recursive, pattern)
+  - search_code: Search code with regex (pattern, path, file_pattern, max_results)
+  - delete_file: Delete a file (path)
+  
+  TOOL USAGE EXAMPLES:
+  To create a file: use write_file with {"path": "filename.txt", "content": "file content"}
+  To check if file exists: use list_files or read_file and check for error
+  NEVER invent tool names - use ONLY the exact names listed above
   
   REPORT FORMAT (strict):
   {

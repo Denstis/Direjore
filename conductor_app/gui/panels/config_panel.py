@@ -216,14 +216,18 @@ class ConfigPanel:
         log_frame.pack(fill=tk.X, padx=10, pady=10)
         
         ttk.Label(log_frame, text="Лог:").pack(side=tk.LEFT, padx=5)
-        self.log_type_var = tk.StringVar(value="api_calls")
+        self.log_type_var = tk.StringVar(value="chat_history")
         
-        self.log_combo = ttk.Combobox(log_frame, textvariable=self.log_type_var, values=["api_calls", "errors", "director", "worker"])
+        self.log_combo = ttk.Combobox(log_frame, textvariable=self.log_type_var, values=["chat_history", "api_calls", "errors", "director", "worker"])
         self.log_combo.pack(side=tk.LEFT, padx=5)
         self.log_combo.bind("<<ComboboxSelected>>", lambda e: self._load_log())
         
         ttk.Button(log_frame, text="🔄 Обновить", command=self._load_log).pack(side=tk.LEFT, padx=5)
         ttk.Button(log_frame, text="🗑 Очистить", command=self._clear_log).pack(side=tk.LEFT, padx=5)
+        
+        # Автоматическое обновление логов
+        self.auto_refresh_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(log_frame, text="Автообновление", variable=self.auto_refresh_var, command=self._toggle_auto_refresh).pack(side=tk.LEFT, padx=10)
         
         # Просмотрщик логов
         view_frame = ttk.LabelFrame(self.logs_tab, text="Содержимое лога")
@@ -231,6 +235,27 @@ class ConfigPanel:
         
         self.log_viewer = scrolledtext.ScrolledText(view_frame, height=25, font=("Consolas", 9))
         self.log_viewer.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Кнопка прокрутки вниз
+        ttk.Button(view_frame, text="⬇ Вниз", command=lambda: self.log_viewer.see(tk.END)).pack(anchor=tk.E, pady=(5, 0))
+        
+        # Запуск автообновления если включено
+        self.auto_refresh_id = None
+        
+    def _toggle_auto_refresh(self):
+        """Переключение автообновления логов."""
+        if self.auto_refresh_var.get():
+            self._schedule_auto_refresh()
+        else:
+            if self.auto_refresh_id:
+                self.frame.after_cancel(self.auto_refresh_id)
+                self.auto_refresh_id = None
+                
+    def _schedule_auto_refresh(self):
+        """Планирование автообновления."""
+        if self.auto_refresh_var.get():
+            self._load_log()
+            self.auto_refresh_id = self.frame.after(2000, self._schedule_auto_refresh)
         
     def _refresh_models(self):
         """Обновление списка моделей."""
@@ -459,6 +484,18 @@ class ConfigPanel:
     def _load_log(self):
         """Загрузка лога."""
         if not self.main_window.current_project_path:
+            # Попытка загрузки глобального лога
+            global_log = Path(__file__).parent.parent.parent / "conductor.log"
+            if global_log.exists():
+                try:
+                    with open(global_log, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+                    self.log_viewer.delete("1.0", tk.END)
+                    self.log_viewer.insert("1.0", content)
+                    self.log_viewer.see(tk.END)
+                    return
+                except Exception as e:
+                    pass
             self.log_viewer.delete("1.0", tk.END)
             self.log_viewer.insert("1.0", "Нет активного проекта")
             return
@@ -467,10 +504,15 @@ class ConfigPanel:
         log_file = self.main_window.current_project_path / "logs" / f"{log_type}.log"
         
         if log_file.exists():
-            with open(log_file, "r", encoding="utf-8") as f:
-                content = f.read()
-            self.log_viewer.delete("1.0", tk.END)
-            self.log_viewer.insert("1.0", content)
+            try:
+                with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                self.log_viewer.delete("1.0", tk.END)
+                self.log_viewer.insert("1.0", content)
+                self.log_viewer.see(tk.END)  # Прокрутка вниз
+            except Exception as e:
+                self.log_viewer.delete("1.0", tk.END)
+                self.log_viewer.insert("1.0", f"Ошибка чтения лога: {e}")
         else:
             self.log_viewer.delete("1.0", tk.END)
             self.log_viewer.insert("1.0", "Лог пуст")

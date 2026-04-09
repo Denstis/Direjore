@@ -35,7 +35,8 @@ async def read_file(project_path: Path, path: str, max_lines: int = 0) -> dict[s
     """
     try:
         # Безопасность: запрет выхода за пределы проекта
-        full_path = safe_join(project_path / "workspace", path)
+        full_path_str = safe_join(project_path / "workspace", path)
+        full_path = Path(full_path_str)  # Конвертируем строку в Path
         
         if not full_path.exists():
             return {"error": f"Файл не найден: {path}"}
@@ -81,7 +82,8 @@ async def write_file(project_path: Path, path: str, content: str, encoding: str 
     """
     try:
         # Безопасность: запрет выхода за пределы проекта
-        full_path = safe_join(project_path / "workspace", path)
+        full_path_str = safe_join(project_path / "workspace", path)
+        full_path = Path(full_path_str)  # Конвертируем строку в Path
         
         if full_path.exists() and not overwrite:
             return {"error": f"Файл уже существует: {path}"}
@@ -127,7 +129,8 @@ async def edit_file(
         {"success": true, "changes": N} или {"error": "..."}
     """
     try:
-        full_path = safe_join(project_path / "workspace", path)
+        full_path_str = safe_join(project_path / "workspace", path)
+        full_path = Path(full_path_str)  # Конвертируем строку в Path
         
         if not full_path.exists():
             return {"error": f"Файл не найден: {path}"}
@@ -187,7 +190,8 @@ async def list_files(project_path: Path, path: str = ".", recursive: bool = Fals
         {"files": [...], "directories": [...]} или {"error": "..."}
     """
     try:
-        base_path = safe_join(project_path / "workspace", path)
+        base_path_str = safe_join(project_path / "workspace", path)
+        base_path = Path(base_path_str)  # Конвертируем строку в Path
         
         if not base_path.exists():
             return {"error": f"Директория не найдена: {path}"}
@@ -249,7 +253,8 @@ async def search_code(
         {"results": [{"file": "...", "line": N, "text": "..."}]} или {"error": "..."}
     """
     try:
-        base_path = safe_join(project_path / "workspace", path)
+        base_path_str = safe_join(project_path / "workspace", path)
+        base_path = Path(base_path_str)  # Конвертируем строку в Path
         
         if not base_path.exists():
             return {"error": f"Директория не найдена: {path}"}
@@ -311,7 +316,8 @@ async def delete_file(project_path: Path, path: str) -> dict[str, Any]:
         {"success": true} или {"error": "..."}
     """
     try:
-        full_path = safe_join(project_path / "workspace", path)
+        full_path_str = safe_join(project_path / "workspace", path)
+        full_path = Path(full_path_str)  # Конвертируем строку в Path
         
         if not full_path.exists():
             return {"error": f"Файл не найден: {path}"}

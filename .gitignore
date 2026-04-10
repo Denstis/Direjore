@@ -22,10 +22,12 @@ wheels/
 *.egg
 
 # Environment
-.venv/
-venv/
-env/
-ENV/
+.env
+.env.local
+*.env.*
+
+# Logs
+*.log
 
 # IDE
 .vscode/
@@ -34,15 +36,7 @@ ENV/
 *.swo
 *.tmp
 
-# Logs
-*.log
-
 # OS
 .DS_Store
 Thumbs.db
-
-# Local config
-.env
-.env.local
-*.env.*
 ```

@@ -11,7 +11,7 @@ from typing import List, Optional
 
 import customtkinter as ctk
 
-from gui_new.app import ChatMessageFrame
+from gui.app import ChatMessageFrame
 
 logger = logging.getLogger(__name__)
 

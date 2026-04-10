@@ -133,55 +133,6 @@ class FileStorage:
         file_path = self.base_path / f"{filename}.json"
         return file_path.exists()
 
-    def list_files(self) -> list[str]:
-        """Список всех JSON файлов в хранилище."""
-        return [f.stem for f in self.base_path.glob("*.json")]
-
-    def append_to_log(self, log_name: str, entry: dict) -> None:
-        """
-        Добавление записи в лог файл.
-        
-        Args:
-            log_name: Имя лога (без расширения)
-            entry: Запись для добавления
-        """
-        log_file = self.base_path / f"{log_name}.log"
-        
-        try:
-            with open(log_file, "a", encoding="utf-8") as f:
-                timestamp = datetime.now().isoformat()
-                f.write(f"[{timestamp}] {json.dumps(entry, ensure_ascii=False)}\n")
-        except Exception as e:
-            logger.error(f"Ошибка записи в лог {log_name}: {e}")
-
-    def rotate_log(self, log_name: str, max_size_bytes: int = 10 * 1024 * 1024) -> None:
-        """
-        Ротация лог файла при превышении размера.
-        
-        Args:
-            log_name: Имя лога
-            max_size_bytes: Максимальный размер в байтах
-        """
-        log_file = self.base_path / f"{log_name}.log"
-        
-        if not log_file.exists():
-            return
-            
-        size = log_file.stat().st_size
-        if size < max_size_bytes:
-            return
-            
-        # Ротация
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        rotated_name = f"{log_name}.{timestamp}.log"
-        rotated_path = self.base_path / rotated_name
-        
-        try:
-            shutil.move(str(log_file), str(rotated_path))
-            logger.info(f"Ротация лога: {log_name} → {rotated_name}")
-        except Exception as e:
-            logger.error(f"Ошибка ротации лога {log_name}: {e}")
-
 
 class SQLiteStorage(FileStorage):
     """

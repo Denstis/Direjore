@@ -1,5 +1,5 @@
 """
-Project Panel — отображение структуры проекта, стадии, прогресса.
+ProjectPanel — отображение структуры проекта, стадии, прогресса.
 """
 
 import json
@@ -143,8 +143,6 @@ class ProjectPanel:
 
     def refresh(self) -> None:
         """Обновление дерева файлов."""
-        logger.info("Пользователь нажал кнопку обновления проекта")
-        
         # Обновление названия проекта
         if self.app.current_project_id:
             self.project_name_label.config(text=f"📄 {self.app.current_project_id}")
@@ -157,29 +155,23 @@ class ProjectPanel:
             self.tree.delete(item)
             
         if not self.app.current_project_path:
-            logger.debug("Проект не выбран, обновление отменено")
             return
             
         workspace_path = self.app.current_project_path / "workspace"
-        logger.debug(f"Попытка обновления дерева для пути: {workspace_path}")
         
         if not workspace_path.exists():
-            logger.warning(f"Папка workspace не найдена: {workspace_path}")
             return
             
         # Построение дерева
         self._build_tree(workspace_path, "")
-        logger.info("Дерево файлов проекта обновлено")
 
     def _build_tree(self, path: Path, parent_id: str) -> None:
         """Рекурсивное построение дерева."""
         try:
-            logger.debug(f"Построение дерева для директории: {path}")
             items = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name))
             
             for item in items:
                 icon = "📁" if item.is_dir() else "📄"
-                logger.debug(f"Добавление элемента: {icon} {item.name}")
                 item_id = self.tree.insert(
                     parent_id,
                     "end",
@@ -195,8 +187,23 @@ class ProjectPanel:
 
     def _export_project(self) -> None:
         """Экспорт проекта в ZIP."""
-        # TODO: Реализация экспорта
-        pass
+        import zipfile
+        from tkinter import filedialog
+        
+        if not self.app.current_project_path:
+            return
+            
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".zip",
+            initialfile=f"{self.app.current_project_id}.zip"
+        )
+        if filename:
+            with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in list(self.app.current_project_path.walk()):
+                    for file in files:
+                        file_path = root / file
+                        arcname = file_path.relative_to(self.app.current_project_path.parent)
+                        zipf.write(file_path, arcname)
 
     def load_state(self) -> None:
         """Загрузка состояния из state.json."""
@@ -221,4 +228,4 @@ class ProjectPanel:
                 self.update_progress(current_step, steps)
                 
         except Exception as e:
-            pass
+            logger.error(f"Ошибка загрузки состояния: {e}")

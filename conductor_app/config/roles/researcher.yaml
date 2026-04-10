@@ -28,8 +28,9 @@ system_prompt: |
   
   AVAILABLE TOOLS:
   - read_file: Read local files
-  - search_web: Search the internet (if available)
-  - read_url: Read web page contents
+  - fetch_url: Fetch web page content (url, method, headers, body)
+  - search_web: Search the internet via DuckDuckGo (query, num_results)
+  - browser_snapshot: Get text content of web page (url, wait_seconds, screenshot)
   - save_research: Save research results
   
   REPORT FORMAT (strict):
@@ -56,8 +57,9 @@ capabilities:
 
 allowed_tools:
   - read_file
+  - fetch_url
   - search_web
-  - read_url
+  - browser_snapshot
   - save_research
 
 model_preference: "qwen2.5-7b-instruct"

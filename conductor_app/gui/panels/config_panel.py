@@ -259,35 +259,27 @@ class ConfigPanel:
         
     def _refresh_models(self):
         """Обновление списка моделей."""
-        logger.info("Пользователь нажал кнопку обновления списка моделей")
-        
         # Очистка treeview
         for item in self.models_tree.get_children():
             self.models_tree.delete(item)
             
         if self.main_window.model_registry:
-            logger.debug("Получение списка моделей из реестра")
             models = self.main_window.model_registry.list_models()
-            logger.info(f"Найдено {len(models)} моделей в реестре")
             
             for model in models:
-                # ModelInfo - это dataclass, используем атрибуты напрямую
                 model_id = model.id
                 context = model.context_window
                 tools = "✅" if model.supports_tools else "❌"
                 quant = model.quantization or "N/A"
                 
-                logger.debug(f"Добавление модели в список: {model_id}, контекст={context}, tools={tools}")
                 self.models_tree.insert("", tk.END, values=(model_id, f"{context}k", tools, quant))
                 
                 # Добавление в combobox
                 current = self.director_model_combo.cget("values")
                 if model_id not in current:
-                    logger.debug(f"Добавление модели {model_id} в выпадающие списки")
                     self.director_model_combo.configure(values=list(current) + [model_id])
                     self.worker_model_combo.configure(values=list(current) + [model_id])
         else:
-            logger.warning("ModelRegistry ещё не инициализирован")
             messagebox.showwarning("Предупреждение", "Сначала создайте или откройте проект")
                     
     def _refresh_roles(self):
@@ -494,7 +486,7 @@ class ConfigPanel:
                     self.log_viewer.insert("1.0", content)
                     self.log_viewer.see(tk.END)
                     return
-                except Exception as e:
+                except Exception:
                     pass
             self.log_viewer.delete("1.0", tk.END)
             self.log_viewer.insert("1.0", "Нет активного проекта")
@@ -509,7 +501,7 @@ class ConfigPanel:
                     content = f.read()
                 self.log_viewer.delete("1.0", tk.END)
                 self.log_viewer.insert("1.0", content)
-                self.log_viewer.see(tk.END)  # Прокрутка вниз
+                self.log_viewer.see(tk.END)
             except Exception as e:
                 self.log_viewer.delete("1.0", tk.END)
                 self.log_viewer.insert("1.0", f"Ошибка чтения лога: {e}")
@@ -530,7 +522,6 @@ class ConfigPanel:
                 
     def _apply_changes(self):
         """Применение изменений."""
-        # Сохранение настроек моделей в models.json
         director_model = self.director_model_var.get()
         worker_model = self.worker_model_var.get()
         
@@ -542,10 +533,7 @@ class ConfigPanel:
                 with open(director_yaml, "r", encoding="utf-8") as f:
                     content = yaml.safe_load(f) or {}
                 
-                if "model_preference" not in content:
-                    content["model_preference"] = director_model
-                else:
-                    content["model_preference"] = director_model
+                content["model_preference"] = director_model
                     
                 with open(director_yaml, "w", encoding="utf-8") as f:
                     yaml.dump(content, f, default_flow_style=False, allow_unicode=True)
@@ -555,4 +543,4 @@ class ConfigPanel:
         
     def show_settings_tab(self):
         """Показ таба настроек."""
-        self.notebook.select(0)  # Переключение на первый таб
+        self.notebook.select(0)

@@ -132,42 +132,6 @@ class ToolRegistry:
             
         return result
 
-    def search_by_description(self, query: str, threshold: float = 0.3) -> list[str]:
-        """
-        Семантический поиск инструментов по описанию (простая версия).
-        
-        Args:
-            query: Поисковый запрос
-            threshold: Порог схожести (0-1)
-            
-        Returns:
-            Список подходящих имён инструментов
-        """
-        # Простой поиск по ключевым словам
-        query_lower = query.lower()
-        results = []
-        
-        for name, schema in self._tools.items():
-            description = schema.get("description", "").lower()
-            
-            # Проверка вхождения слов из запроса
-            words = query_lower.split()
-            matches = sum(1 for word in words if word in description)
-            score = matches / len(words) if words else 0
-            
-            if score >= threshold:
-                results.append(name)
-                
-        return results
-
-    def list_categories(self) -> list[str]:
-        """Вернуть список категорий."""
-        return list(self._categories.keys())
-
-    def get_tools_by_category(self, category: str) -> list[str]:
-        """Вернуть инструменты категории."""
-        return self._categories.get(category, [])
-
     def validate_arguments(self, tool_name: str, arguments: dict) -> tuple[bool, Optional[str]]:
         """
         Валидировать аргументы инструмента против схемы.

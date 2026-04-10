@@ -8,7 +8,7 @@ import json
 import logging
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,7 @@ class FindDialog(tk.Toplevel):
         
         start = "1.0"
         found_count = 0
+        last_pos = None
         while True:
             pos = self.editor.search(search_term, start, stopindex=tk.END)
             if not pos:
@@ -142,13 +143,14 @@ class FindDialog(tk.Toplevel):
             end_pos = f"{pos}+{len(search_term)}c"
             self.editor.tag_add("found", pos, end_pos)
             self.editor.tag_config("found", background="yellow")
+            last_pos = pos
             start = end_pos
             found_count += 1
             
         if found_count == 0:
             messagebox.showinfo("Поиск", "Текст не найден")
         else:
-            self.editor.see(pos)
+            self.editor.see(last_pos)
 
 
 class ReplaceDialog(tk.Toplevel):
@@ -294,7 +296,8 @@ class ChatPanel:
         """Добавление сообщения в историю."""
         self.history_text.config(state=tk.NORMAL)
         
-        timestamp = f"[{__import__('datetime').datetime.now().strftime('%H:%M:%S')}] "
+        from datetime import datetime
+        timestamp = f"[{datetime.now().strftime('%H:%M:%S')}] "
         
         role_icons = {
             "user": "👤 Вы:",
@@ -310,9 +313,8 @@ class ChatPanel:
         self.history_text.insert(tk.END, timestamp, "timestamp")
         self.history_text.insert(tk.END, "\n")
         
-        # Если collapsible=True, создаём спойлер
+        # Если collapsible=True и есть переносы строк, создаём спойлер
         if collapsible and isinstance(content, str) and "\n" in content:
-            # Разделяем на заголовок и тело
             lines = content.split("\n", 1)
             header = lines[0]
             body = lines[1] if len(lines) > 1 else ""
@@ -320,7 +322,7 @@ class ChatPanel:
             # Вставляем заголовок
             self.history_text.insert(tk.END, f"{icon} {header}\n", role)
             
-            # Создаём спойлер (текст, который можно скрыть/показать)
+            # Создаём спойлер
             spoiler_start = self.history_text.index(tk.END)
             self.history_text.insert(tk.END, body + "\n\n", role)
             spoiler_end = self.history_text.index(tk.END)
@@ -351,14 +353,11 @@ class ChatPanel:
     def _toggle_spoiler(self, start: str, end: str) -> None:
         """Переключение видимости спойлера."""
         try:
-            # Проверяем текущее состояние
             tags = self.history_text.tag_names(f"{start}+1c")
             if "hidden" in tags:
-                # Показываем спойлер
                 self.history_text.tag_remove("hidden", start, end)
                 self.history_text.tag_config("hidden", elide=False)
             else:
-                # Скрываем спойлер
                 self.history_text.tag_config("hidden", elide=True)
                 self.history_text.tag_add("hidden", start, end)
         except Exception as e:
@@ -366,13 +365,10 @@ class ChatPanel:
         
     def show_question(self, question: str, options: List[str]) -> None:
         """Показ вопроса пользователю."""
-        logger.info(f"Показ вопроса пользователю: {question[:100] if question else 'пустой'}...")
-        logger.debug(f"Опции ответа: {options}")
-        
-        # Добавляем timestamp и вопрос
         self.history_text.config(state=tk.NORMAL)
         
-        timestamp = f"[{__import__('datetime').datetime.now().strftime('%H:%M:%S')}] "
+        from datetime import datetime
+        timestamp = f"[{datetime.now().strftime('%H:%M:%S')}] "
         self.history_text.insert(tk.END, timestamp, "timestamp")
         self.history_text.insert(tk.END, "\n")
         
@@ -389,8 +385,6 @@ class ChatPanel:
         
         self.history_text.config(state=tk.DISABLED)
         self.history_text.see(tk.END)
-        
-        logger.info("Вопрос успешно отображён в интерфейсе")
                 
     def clear_history(self) -> None:
         """Очистка истории."""
@@ -402,15 +396,9 @@ class ChatPanel:
         """Отправка сообщения."""
         message = self.input_text.get("1.0", tk.END).strip()
         if not message:
-            logger.debug("Пользователь попытался отправить пустое сообщение")
             return
             
-        logger.info(f"Пользователь отправил сообщение ({len(message)} символов): {message[:50]}...")
-        
-        # Отправка через main window
         self.main_window.send_message(message)
-        
-        # Очистка поля ввода
         self.input_text.delete("1.0", tk.END)
         
     def _on_enter_pressed(self, event) -> str:

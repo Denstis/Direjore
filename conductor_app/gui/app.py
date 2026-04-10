@@ -104,9 +104,6 @@ class MainWindow(tk.Tk):
         self.title("🎭 Дирижёр — Multi-Agent System")
         self.geometry("1400x900")
         
-        # Настройка стилей (не применяется к Menu в ttkbootstrap)
-        # self.option_add("*Font", "Segoe UI 10")
-        
         # Инициализация компонентов
         self.async_bridge = AsyncBridge(self)
         self.client: Optional[LMStudioClient] = None
@@ -219,10 +216,8 @@ class MainWindow(tk.Tk):
     def _on_ask_user(self, event) -> None:
         """Запрос уточнения у пользователя."""
         try:
-            # Попытка получить данные из атрибута data
             data = getattr(event, 'data', {})
             if not data:
-                # Альтернативная попытка получить данные
                 data = {}
             question = data.get('question', '')
             options = data.get('options', [])
@@ -242,7 +237,6 @@ class MainWindow(tk.Tk):
         task = data.get('task', '')
         tools = data.get('tools', [])
         
-        # Формируем понятное сообщение с деталями
         message = f"🤖 Делегировано роли **{role}**\n\n📋 Задача: {task}"
         
         if tools:
@@ -257,7 +251,6 @@ class MainWindow(tk.Tk):
         tool = data.get('tool', '')
         arguments = data.get('arguments', {})
         
-        # Формируем читаемое сообщение
         args_str = ', '.join(f"{k}={v}" for k, v in arguments.items()) if arguments else 'без параметров'
         message = f"🔧 Вызов инструмента **{tool}**\n\nПараметры: {args_str}"
         self.chat_panel.add_message("tool", message)
@@ -275,14 +268,12 @@ class MainWindow(tk.Tk):
         success = data.get('success', False)
         report = data.get('report', {})
         
-        # Формируем подробное сообщение для пользователя
         summary = report.get('summary', 'Задача выполнена')
         files_created = report.get('files_created', [])
         files_modified = report.get('files_modified', [])
         errors = report.get('errors', [])
         tool_calls = report.get('tool_calls', [])
         
-        # Строим подробный текст с заголовком для спойлера
         message_parts = [f"✅ Задача выполнена" if success else f"⚠️ Задача выполнена с ошибками"]
         
         if tool_calls:
@@ -303,7 +294,6 @@ class MainWindow(tk.Tk):
             message_parts.append(f"\n⚠️ Ошибки:\n{errors_list}")
         
         full_message = ''.join(message_parts)
-        # Используем collapsible=True для возможности сворачивания подробностей
         self.chat_panel.add_message("assistant" if success else "error", full_message, collapsible=True)
 
     def _on_final(self, event) -> None:
@@ -326,7 +316,6 @@ class MainWindow(tk.Tk):
 
     def _new_project(self) -> None:
         """Создание нового проекта."""
-        # Диалог создания проекта
         dialog = tk.Toplevel(self)
         dialog.title("Новый проект")
         dialog.geometry("400x200")
@@ -338,7 +327,6 @@ class MainWindow(tk.Tk):
         def create():
             project_id = entry.get().strip()
             if project_id:
-                # Сброс чата перед инициализацией нового проекта
                 self.chat_panel.clear_history()
                 self._initialize_project(project_id)
                 dialog.destroy()
@@ -347,14 +335,12 @@ class MainWindow(tk.Tk):
 
     def _open_project(self) -> None:
         """Открытие существующего проекта."""
-        # Получение списка проектов из директории projects
         projects_root = Path(self.settings.get("project_root", "./projects"))
         
         if not projects_root.exists():
             messagebox.showwarning("Проекты", "Директория проектов не найдена")
             return
             
-        # Поиск существующих проектов (папки с state.json)
         existing_projects = []
         for project_dir in projects_root.iterdir():
             if project_dir.is_dir():
@@ -381,14 +367,12 @@ class MainWindow(tk.Tk):
             messagebox.showinfo("Проекты", "Нет существующих проектов")
             return
         
-        # Диалог выбора проекта
         dialog = tk.Toplevel(self)
         dialog.title("Открыть проект")
         dialog.geometry("500x300")
         
         tk.Label(dialog, text="Выберите проект:", font=("Segoe UI", 11, "bold")).pack(pady=10)
         
-        # Список проектов
         listbox_frame = ttk.Frame(dialog)
         listbox_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
@@ -399,7 +383,6 @@ class MainWindow(tk.Tk):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         listbox.configure(yscrollcommand=scrollbar.set)
         
-        # Заполнение списка
         for proj in existing_projects:
             stage_icons = {
                 "idle": "⚪",
@@ -413,31 +396,30 @@ class MainWindow(tk.Tk):
             icon = stage_icons.get(proj["stage"], "⚪")
             listbox.insert(tk.END, f"{icon} {proj['id']} ({proj['created']})")
         
-        def open_selected():
-            selection = listbox.curselection()
-            if selection:
-                idx = selection[0]
-                project_id = existing_projects[idx]["id"]
-                # Сброс чата перед открытием проекта
-                self.chat_panel.clear_history()
-                self._initialize_project(project_id)
-                # Загрузка истории чата из лога проекта если существует
-                self._load_chat_history(project_id)
-                dialog.destroy()
-        
         btn_frame = ttk.Frame(dialog)
         btn_frame.pack(pady=10)
+        
+        def open_selected():
+            selection = listbox.curselection()
+            if not selection:
+                return
+            idx = selection[0]
+            project_id = existing_projects[idx]["id"]
+            self.chat_panel.clear_history()
+            self._initialize_project(project_id)
+            dialog.destroy()
         
         tk.Button(btn_frame, text="Открыть", command=open_selected).pack(side=tk.LEFT, padx=10)
         tk.Button(btn_frame, text="Отмена", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
         
-        # Двойной клик для открытия
         listbox.bind("<Double-Button-1>", lambda e: open_selected())
 
     def _export_project(self) -> None:
         """Экспорт проекта в ZIP."""
-        # TODO: Экспорт
-        pass
+        if self.current_project_path:
+            self.project_panel._export_project()
+        else:
+            messagebox.showwarning("Предупреждение", "Нет активного проекта для экспорта")
 
     def _refresh_view(self) -> None:
         """Обновление вида."""
@@ -452,7 +434,7 @@ class MainWindow(tk.Tk):
         """О программе."""
         tk.messagebox.showinfo(
             "О программе",
-            "🎭 Дирижёр\nMulti-Agent System\n\nВерсия 0.1.0"
+            "🎭 Дирижёр\nMulti-Agent System\n\nВерсия 0.2.0"
         )
 
     # =============================================================================
@@ -467,7 +449,6 @@ class MainWindow(tk.Tk):
         projects_root = Path(self.settings.get("project_root", "./projects"))
         self.current_project_path = projects_root / project_id
         
-        # Инициализация компонентов если ещё не созданы
         if not self.client:
             logger.info("Инициализация LM Studio клиента")
             lmstudio_config = self.settings.get("lmstudio", {})
@@ -480,7 +461,6 @@ class MainWindow(tk.Tk):
             logger.info("Загрузка всех инструментов")
             self.tool_registry.load_all()
             
-            # Проверка подключения к LM Studio и загрузка моделей
             async def check_lmstudio_and_load_models():
                 try:
                     logger.info("Проверка подключения к LM Studio...")
@@ -488,9 +468,7 @@ class MainWindow(tk.Tk):
                     if models:
                         logger.info(f"LM Studio подключено, найдено {len(models)} моделей")
                         self.status_bar.set_connection_status(True, lmstudio_config.get("base_url", "http://localhost:1234"))
-                        # Загрузка моделей в реестр
                         await self.model_registry.load()
-                        # Обновление списка моделей в UI
                         self.config_panel._refresh_models()
                     else:
                         logger.warning("LM Studio подключено, но модели не найдены")
@@ -501,7 +479,6 @@ class MainWindow(tk.Tk):
             
             self.async_bridge.run_coroutine(check_lmstudio_and_load_models())
             
-        # Создание Conductor
         logger.info(f"Создание Conductor для проекта {project_id}")
         self.conductor = Conductor(
             client=self.client,
@@ -511,13 +488,10 @@ class MainWindow(tk.Tk):
             project_root=projects_root,
         )
         
-        # Memory manager
         self.memory_manager = MemoryManager(self.current_project_path)
         
-        # Регистрация хендлеров инструментов (после создания memory_manager)
         self._register_tool_handlers()
         
-        # Инициализация Conductor
         async def init():
             await self.conductor.initialize()
             
@@ -529,9 +503,13 @@ class MainWindow(tk.Tk):
     def _register_tool_handlers(self) -> None:
         """Регистрация handlers инструментов."""
         from src.agents.tools.file_ops import register_file_handlers
+        from src.agents.tools.system_ops import register_system_handlers
+        from src.agents.tools.network_ops import register_network_handlers
         from src.agents.tools.memory_ops import register_memory_handlers
         
         register_file_handlers(self.tool_registry, self.current_project_path)
+        register_system_handlers(self.tool_registry, self.current_project_path)
+        register_network_handlers(self.tool_registry, self.current_project_path)
         register_memory_handlers(self.tool_registry, self.memory_manager)
 
     def send_message(self, message: str) -> None:
@@ -563,9 +541,7 @@ class MainWindow(tk.Tk):
                     if not line:
                         continue
                     
-                    # Парсинг строки лога: [timestamp] role: content
                     if line.startswith("["):
-                        # Извлечение роли и контента
                         try:
                             bracket_end = line.index("]")
                             rest = line[bracket_end+1:].strip()

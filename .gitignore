@@ -13,18 +13,14 @@ env/
 .env.local
 .env.*
 
-# Logs and temp files
+# Logs
 *.log
-*.tmp
 
-# Editors
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Build artifacts
-dist/
-build/
-target/
+# OS
+.DS_Store
+Thumbs.db
 ```

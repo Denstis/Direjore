@@ -240,9 +240,15 @@ class MainWindow(tk.Tk):
         data = getattr(event, 'data', {})
         role = data.get('role', '')
         task = data.get('task', '')
+        tools = data.get('tools', [])
         
-        # Формируем понятное сообщение
+        # Формируем понятное сообщение с деталями
         message = f"🤖 Делегировано роли **{role}**\n\n📋 Задача: {task}"
+        
+        if tools:
+            tools_str = ', '.join(tools)
+            message += f"\n\n🔧 Доступные инструменты: {tools_str}"
+        
         self.chat_panel.add_message("system", message)
 
     def _on_tool_call(self, event) -> None:
@@ -274,9 +280,15 @@ class MainWindow(tk.Tk):
         files_created = report.get('files_created', [])
         files_modified = report.get('files_modified', [])
         errors = report.get('errors', [])
+        tool_calls = report.get('tool_calls', [])
         
-        # Строим подробный текст
-        message_parts = [summary]
+        # Строим подробный текст с заголовком для спойлера
+        message_parts = [f"✅ Задача выполнена" if success else f"⚠️ Задача выполнена с ошибками"]
+        
+        if tool_calls:
+            tools_used = [tc.get('tool_name', '') for tc in tool_calls if isinstance(tc, dict)]
+            if tools_used:
+                message_parts.append(f"\n\n🔧 Использованы инструменты: {', '.join(tools_used)}")
         
         if files_created:
             files_list = ', '.join(files_created)
@@ -291,7 +303,8 @@ class MainWindow(tk.Tk):
             message_parts.append(f"\n⚠️ Ошибки:\n{errors_list}")
         
         full_message = ''.join(message_parts)
-        self.chat_panel.add_message("assistant" if success else "error", full_message)
+        # Используем collapsible=True для возможности сворачивания подробностей
+        self.chat_panel.add_message("assistant" if success else "error", full_message, collapsible=True)
 
     def _on_final(self, event) -> None:
         """Завершение задачи."""

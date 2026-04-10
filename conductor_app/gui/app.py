@@ -240,14 +240,21 @@ class MainWindow(tk.Tk):
         data = getattr(event, 'data', {})
         role = data.get('role', '')
         task = data.get('task', '')
-        self.chat_panel.add_message("system", f"🤖 Делегировано роли {role}: {task}")
+        
+        # Формируем понятное сообщение
+        message = f"🤖 Делегировано роли **{role}**\n\n📋 Задача: {task}"
+        self.chat_panel.add_message("system", message)
 
     def _on_tool_call(self, event) -> None:
         """Вызов инструмента."""
         data = getattr(event, 'data', {})
         tool = data.get('tool', '')
         arguments = data.get('arguments', {})
-        self.chat_panel.add_message("system", f"🔧 Вызов {tool}({json.dumps(arguments)})")
+        
+        # Формируем читаемое сообщение
+        args_str = ', '.join(f"{k}={v}" for k, v in arguments.items()) if arguments else 'без параметров'
+        message = f"🔧 Вызов инструмента **{tool}**\n\nПараметры: {args_str}"
+        self.chat_panel.add_message("tool", message)
 
     def _on_tool_result(self, event) -> None:
         """Результат инструмента."""
@@ -261,8 +268,30 @@ class MainWindow(tk.Tk):
         data = getattr(event, 'data', {})
         success = data.get('success', False)
         report = data.get('report', {})
+        
+        # Формируем подробное сообщение для пользователя
         summary = report.get('summary', 'Задача выполнена')
-        self.chat_panel.add_message("system", f"{'✅' if success else '⚠️'} {summary}")
+        files_created = report.get('files_created', [])
+        files_modified = report.get('files_modified', [])
+        errors = report.get('errors', [])
+        
+        # Строим подробный текст
+        message_parts = [summary]
+        
+        if files_created:
+            files_list = ', '.join(files_created)
+            message_parts.append(f"\n📁 Создано файлов: {files_list}")
+            
+        if files_modified:
+            files_list = ', '.join(files_modified)
+            message_parts.append(f"\n✏️ Изменено файлов: {files_list}")
+            
+        if errors:
+            errors_list = '\n'.join(f"  • {e}" for e in errors)
+            message_parts.append(f"\n⚠️ Ошибки:\n{errors_list}")
+        
+        full_message = ''.join(message_parts)
+        self.chat_panel.add_message("assistant" if success else "error", full_message)
 
     def _on_final(self, event) -> None:
         """Завершение задачи."""

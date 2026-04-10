@@ -138,6 +138,10 @@ class Conductor:
         self.iteration = 0
         
         try:
+            # ШАГ 1: Запись задания в память проекта при получении
+            logger.info("ШАГ 1: Запись задания в память проекта")
+            await self._log_task_assignment(user_message)
+            
             # Переключение в стадию планирования
             self.state.stage = ProjectStage.PLANNING
             await self._save_state()
@@ -195,6 +199,11 @@ class Conductor:
                     async for event in worker.execute():
                         yield event
                         
+                    # ШАГ 2: Запись результатов работы агентов в память проекта
+                    logger.info("ШАГ 2: Запись результатов работы агентов в память проекта")
+                    if event.get("type") == "agent_done":
+                        await self._log_agent_completion(event)
+                    
                     # Проверка результата
                     if event.get("type") == "agent_done" and event.get("success"):
                         # Переход к следующему шагу или финал
@@ -204,6 +213,16 @@ class Conductor:
                         yield {"type": "needs_correction", "error": event.get("error")}
                         
                 elif action.action_type == DirectorActionType.FINAL:
+                    # ШАГ 3: Проверка директором и принятие решения о завершении
+                    logger.info("ШАГ 3: Проверка директором - принятие решения о завершении")
+                    
+                    # Чтение памяти проекта для принятия решения
+                    memory_context = await self._get_project_context()
+                    task_history = memory_context.get("task_history", [])
+                    completed_tasks = memory_context.get("completed_tasks", [])
+                    
+                    logger.info(f"Всего задач в истории: {len(task_history)}, завершено: {len(completed_tasks)}")
+                    
                     # Завершение
                     self.state.stage = ProjectStage.DONE
                     await self._save_state()
@@ -337,6 +356,137 @@ class Conductor:
             "active_role": self.state.active_role,
             "last_error": self.state.last_error,
         }
+
+    # =============================================================================
+    # МЕТОДЫ ДЛЯ АЛГОРИТМА ПЕРЕДАЧИ КОНТЕКСТА
+    # =============================================================================
+
+    async def _log_task_assignment(self, user_message: str) -> None:
+        """
+        ШАГ 1: Запись задания в память проекта при получении.
+        
+        Args:
+            user_message: Текст задания от пользователя
+        """
+        logger.info(f"Запись задания в память проекта: {user_message[:100]}...")
+        
+        memory_file = self.project_path / "memory" / "project.json"
+        
+        # Чтение существующих данных
+        data = {}
+        if memory_file.exists():
+            try:
+                with open(memory_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as e:
+                logger.warning(f"Ошибка чтения перед записью: {e}")
+        
+        # Инициализация структуры task_history если не существует
+        if "task_history" not in data:
+            data["task_history"] = []
+        
+        # Добавление новой задачи в историю
+        task_entry = {
+            "id": len(data["task_history"]) + 1,
+            "timestamp": datetime.now().isoformat(),
+            "task": user_message,
+            "status": "assigned",
+            "iteration": self.iteration,
+        }
+        
+        data["task_history"].append(task_entry)
+        
+        # Обновление текущего задания
+        data["current_task"] = {
+            "id": task_entry["id"],
+            "task": user_message,
+            "assigned_at": task_entry["timestamp"],
+            "status": "in_progress",
+        }
+        
+        # Атомарная запись
+        temp_file = memory_file.with_suffix(".tmp")
+        try:
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            temp_file.rename(memory_file)
+            logger.info(f"Задание записано в память проекта под ID {task_entry['id']}")
+        except Exception as e:
+            logger.error(f"Ошибка записи задания в память: {e}")
+
+    async def _log_agent_completion(self, event: dict) -> None:
+        """
+        ШАГ 2: Запись результатов работы агентов в память проекта.
+        
+        Args:
+            event: Событие agent_done с результатами работы
+        """
+        logger.info("Запись результатов работы агента в память проекта")
+        
+        memory_file = self.project_path / "memory" / "project.json"
+        
+        # Чтение существующих данных
+        data = {}
+        if memory_file.exists():
+            try:
+                with open(memory_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as e:
+                logger.warning(f"Ошибка чтения перед записью: {e}")
+        
+        # Извлечение отчёта из события
+        report = event.get("report", {})
+        success = event.get("success", False)
+        
+        # Инициализация структуры completed_tasks если не существует
+        if "completed_tasks" not in data:
+            data["completed_tasks"] = []
+        
+        # Создание записи о завершённой задаче
+        completion_entry = {
+            "id": len(data["completed_tasks"]) + 1,
+            "timestamp": datetime.now().isoformat(),
+            "task_id": data.get("current_task", {}).get("id"),
+            "status": "completed" if success else "failed",
+            "summary": report.get("summary", ""),
+            "files_created": report.get("files_created", []),
+            "files_modified": report.get("files_modified", []),
+            "errors": report.get("errors", []),
+            "artifacts": report.get("artifacts", {}),
+            "recommendations": report.get("recommendations", []),
+            "tool_calls_count": len(report.get("tool_calls", [])),
+        }
+        
+        data["completed_tasks"].append(completion_entry)
+        
+        # Обновление статуса текущего задания
+        if "current_task" in data:
+            data["current_task"]["status"] = "completed" if success else "failed"
+            data["current_task"]["completed_at"] = datetime.now().isoformat()
+            data["current_task"]["result_summary"] = report.get("summary", "")
+        
+        # Добавление в общую историю изменений
+        if "history" not in data:
+            data["history"] = []
+        
+        history_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": "agent_completion",
+            "role": self.state.active_role if self.state else "unknown",
+            "success": success,
+            "summary": report.get("summary", ""),
+        }
+        data["history"].append(history_entry)
+        
+        # Атомарная запись
+        temp_file = memory_file.with_suffix(".tmp")
+        try:
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            temp_file.rename(memory_file)
+            logger.info(f"Результаты агента записаны в память проекта (успех: {success})")
+        except Exception as e:
+            logger.error(f"Ошибка записи результатов агента в память: {e}")
 
     def cancel(self) -> None:
         """Установка флага прерывания."""

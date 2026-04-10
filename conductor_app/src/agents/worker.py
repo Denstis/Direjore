@@ -102,6 +102,11 @@ class Worker:
                     logger.debug("Контекст проекта пуст")
                     
             # Получение разрешённых инструментов
+            # Если allowed_tools пуст, загружаем все инструменты из конфига роли
+            if not self.allowed_tools:
+                self.allowed_tools = self.role_config.get("allowed_tools", [])
+                logger.info(f"Загружены инструменты из конфига роли {self.role_name}: {self.allowed_tools}")
+            
             allowed_schemas = self.tool_registry.get_tools_for_openai(self.allowed_tools)
             
             # Проверка что инструменты действительно доступны

@@ -8,6 +8,8 @@ File Operations Tools — handlers для работы с файлами.
 - delete_file: Удаление файла
 - edit_file: Редактирование файла (поиск/замена)
 - search_code: Поиск по содержимому файлов
+- mkdir: Создание директории
+- move: Перемещение/переименование файла или директории
 """
 
 import asyncio
@@ -338,6 +340,87 @@ async def delete_file(project_path: Path, path: str) -> dict[str, Any]:
         return {"error": str(e)}
 
 
+async def mkdir(project_path: Path, path: str, parents: bool = True) -> dict[str, Any]:
+    """
+    Создание директории.
+    
+    Args:
+        project_path: Путь к проекту
+        path: Относительный путь к директории
+        parents: Создавать ли родительские директории
+        
+    Returns:
+        {"success": true, "path": "..."} или {"error": "..."}
+    """
+    try:
+        full_path_str = safe_join(project_path / "workspace", path)
+        full_path = Path(full_path_str)
+        
+        if full_path.exists():
+            if full_path.is_dir():
+                return {"success": True, "path": path, "message": "Директория уже существует"}
+            else:
+                return {"error": f"Файл с таким именем уже существует: {path}"}
+        
+        await asyncio.sleep(0.01)
+        
+        if parents:
+            full_path.mkdir(parents=True, exist_ok=True)
+        else:
+            full_path.mkdir()
+        
+        return {"success": True, "path": path}
+        
+    except ValueError as e:
+        return {"error": f"Небезопасный путь: {e}"}
+    except Exception as e:
+        logger.error(f"Ошибка создания директории {path}: {e}")
+        return {"error": str(e)}
+
+
+async def move(project_path: Path, src: str, dst: str) -> dict[str, Any]:
+    """
+    Перемещение или переименование файла/директории.
+    
+    Args:
+        project_path: Путь к проекту
+        src: Исходный относительный путь
+        dst: Целевой относительный путь
+        
+    Returns:
+        {"success": true, "src": "...", "dst": "..."} или {"error": "..."}
+    """
+    try:
+        src_path_str = safe_join(project_path / "workspace", src)
+        dst_path_str = safe_join(project_path / "workspace", dst)
+        
+        src_path = Path(src_path_str)
+        dst_path = Path(dst_path_str)
+        
+        if not src_path.exists():
+            return {"error": f"Исходный путь не найден: {src}"}
+        
+        if dst_path.exists():
+            return {"error": f"Целевой путь уже существует: {dst}"}
+        
+        # Проверка что целевая директория существует (если dst внутри директории)
+        dst_parent = dst_path.parent
+        if not dst_parent.exists():
+            return {"error": f"Родительская директория не существует: {dst_parent.name}"}
+        
+        await asyncio.sleep(0.01)
+        
+        src_path.rename(dst_path)
+        
+        return {"success": True, "src": src, "dst": dst}
+        
+    except ValueError as e:
+        return {"error": f"Небезопасный путь: {e}"}
+    except Exception as e:
+        logger.error(f"Ошибка перемещения {src} -> {dst}: {e}")
+        return {"error": str(e)}
+
+
 def register_file_handlers(tool_registry, project_path: Path) -> None:
     """
     Регистрация всех file ops handlers в реестре.
@@ -355,6 +438,8 @@ def register_file_handlers(tool_registry, project_path: Path) -> None:
         "list_files": partial(list_files, project_path),
         "search_code": partial(search_code, project_path),
         "delete_file": partial(delete_file, project_path),
+        "mkdir": partial(mkdir, project_path),
+        "move": partial(move, project_path),
     }
     
     for name, handler in handlers.items():

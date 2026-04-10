@@ -218,11 +218,3 @@ class LMStudioClient:
             
         # Значение по умолчанию
         return 8192
-
-    def update_model_cache(self, model_id: str, info: ModelInfo):
-        """Обновить кэш информации о модели (из config/models.json)."""
-        self._models_cache[model_id] = info
-
-    def get_model_info(self, model_id: str) -> Optional[ModelInfo]:
-        """Получить информацию о модели из кэша."""
-        return self._models_cache.get(model_id)

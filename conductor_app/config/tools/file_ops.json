@@ -151,6 +151,47 @@
     },
     "handler": "file_ops.delete_file",
     "category": "file"
+  },
+  {
+    "name": "mkdir",
+    "description": "Create a new directory in the project workspace. Can create parent directories if needed.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Relative path to the directory to create"
+        },
+        "parents": {
+          "type": "boolean",
+          "description": "Create parent directories if they don't exist",
+          "default": true
+        }
+      },
+      "required": ["path"]
+    },
+    "handler": "file_ops.mkdir",
+    "category": "file"
+  },
+  {
+    "name": "move",
+    "description": "Move or rename a file or directory within the project workspace.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string",
+          "description": "Source relative path"
+        },
+        "dst": {
+          "type": "string",
+          "description": "Destination relative path"
+        }
+      },
+      "required": ["src", "dst"]
+    },
+    "handler": "file_ops.move",
+    "category": "file"
   }
 ]
 

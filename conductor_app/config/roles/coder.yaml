@@ -27,15 +27,19 @@ system_prompt: |
   - Output ONLY raw JSON for the final report, nothing else
   
   AVAILABLE TOOLS (use EXACT names):
-  - write_file: Create or overwrite a file (path, content, encoding)
   - read_file: Read file contents (path, max_lines)
+  - write_file: Create or overwrite a file (path, content, encoding)
   - edit_file: Edit file with find/replace or insert (path, old_text, new_text, insert_line, insert_text)
   - list_files: List files in directory (path, recursive, pattern)
   - search_code: Search code with regex (pattern, path, file_pattern, max_results)
   - delete_file: Delete a file (path)
+  - mkdir: Create a directory (path, parents)
+  - move: Move or rename a file/directory (src, dst)
   
   TOOL USAGE EXAMPLES:
   To create a file: use write_file with {"path": "filename.txt", "content": "file content"}
+  To create a directory: use mkdir with {"path": "dirname", "parents": true}
+  To rename a file: use move with {"src": "old.txt", "dst": "new.txt"}
   To check if file exists: use list_files or read_file and check for error
   NEVER invent tool names - use ONLY the exact names listed above
   
@@ -63,6 +67,9 @@ allowed_tools:
   - edit_file
   - list_files
   - search_code
+  - delete_file
+  - mkdir
+  - move
 
 model_preference: "qwen2.5-coder-7b"
 temperature: 0.3

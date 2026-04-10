@@ -134,25 +134,3 @@ class ModelRegistry:
             return all_models[0].id
             
         return None
-
-    def get_available_models_list(self) -> list[str]:
-        """Вернуть список ID доступных моделей."""
-        return [m.id for m in self._models.values()]
-
-    def apply_manual_override(self, model_id: str, **kwargs) -> None:
-        """
-        Применить ручной оверрайд для модели.
-        
-        Args:
-            model_id: ID модели
-            kwargs: Поля для обновления (context_window, supports_tools, etc.)
-        """
-        if model_id not in self._models:
-            self._models[model_id] = ModelInfo(id=model_id)
-            
-        model = self._models[model_id]
-        for key, value in kwargs.items():
-            if hasattr(model, key):
-                setattr(model, key, value)
-                
-        logger.info(f"Применён оверрайд для {model_id}: {kwargs}")

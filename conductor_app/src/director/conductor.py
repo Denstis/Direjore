@@ -404,15 +404,24 @@ class Conductor:
             "status": "in_progress",
         }
         
-        # Атомарная запись
+        # Атомарная запись с использованием os.replace() для кроссплатформенности
         temp_file = memory_file.with_suffix(".tmp")
         try:
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            temp_file.rename(memory_file)
+            
+            # Кроссплатформенное атомарное переименование через os.replace
+            import os
+            os.replace(str(temp_file), str(memory_file))
             logger.info(f"Задание записано в память проекта под ID {task_entry['id']}")
         except Exception as e:
             logger.error(f"Ошибка записи задания в память: {e}")
+            # Очистка temp файла если он остался
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except:
+                    pass
 
     async def _log_agent_completion(self, event: dict) -> None:
         """
@@ -478,15 +487,24 @@ class Conductor:
         }
         data["history"].append(history_entry)
         
-        # Атомарная запись
+        # Атомарная запись с использованием os.replace() для кроссплатформенности
         temp_file = memory_file.with_suffix(".tmp")
         try:
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            temp_file.rename(memory_file)
+            
+            # Кроссплатформенное атомарное переименование через os.replace
+            import os
+            os.replace(str(temp_file), str(memory_file))
             logger.info(f"Результаты агента записаны в память проекта (успех: {success})")
         except Exception as e:
             logger.error(f"Ошибка записи результатов агента в память: {e}")
+            # Очистка temp файла если он остался
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except:
+                    pass
 
     def cancel(self) -> None:
         """Установка флага прерывания."""

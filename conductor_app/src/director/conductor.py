@@ -107,16 +107,14 @@ class Conductor:
         state_data = self.state.model_dump(mode="json")
         state_data["updated_at"] = datetime.now().isoformat()
         
-        # Атомарная запись: temp → rename
+        # Атомарная запись: temp → replace (кроссплатформенно)
         temp_file = state_file.with_suffix(".tmp")
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(state_data, f, indent=2, ensure_ascii=False)
         
-        # На Windows rename может失败 если target существует, поэтому сначала удаляем
-        import sys
-        if sys.platform == "win32" and state_file.exists():
-            state_file.unlink()
-        temp_file.rename(state_file)
+        # os.replace работает на всех платформах, даже если target существует
+        import os
+        os.replace(temp_file, state_file)
 
     async def process_request(self, user_message: str) -> AsyncGenerator[dict, None]:
         """
@@ -148,10 +146,39 @@ class Conductor:
             logger.debug(f"Стадия изменена на: planning")
             yield {"type": "stage_changed", "stage": "planning"}
             
+            # P1.2: Проверка лимита неудачных попыток перед началом цикла
+            memory_context = await self._get_project_context()
+            completed_tasks = memory_context.get("completed_tasks", [])
+            failed_count = sum(1 for t in completed_tasks if t.get("status") == "failed")
+            
+            if failed_count >= 3:
+                logger.error(f"Превышен лимит неудачных попыток: {failed_count}/3")
+                self.state.stage = ProjectStage.ERROR
+                self.state.last_error = "Превышен лимит неудачных попыток (3)"
+                await self._save_state()
+                yield {
+                    "type": "error",
+                    "message": f"Превышен лимит неудачных попыток ({failed_count}/3). Требуется вмешательство пользователя."
+                }
+                return
+            
+            logger.info(f"Статистика выполнения: завершено={len(completed_tasks)}, неудачи={failed_count}/3")
+            
             # Цикл выполнения
             while self.iteration < self.max_iterations and not self.cancel_flag:
                 self.iteration += 1
                 logger.info(f"Итерация {self.iteration}/{self.max_iterations}")
+                
+                # P3.2: Расширенное логирование для отладки
+                memory_context = await self._get_project_context()
+                completed_tasks = memory_context.get("completed_tasks", [])
+                current_task = memory_context.get("current_task", {})
+                logger.info(
+                    f"ITERATION {self.iteration}: action=pending, "
+                    f"completed_tasks={len(completed_tasks)}, "
+                    f"current_task_id={current_task.get('id', 'N/A')}, "
+                    f"stage={self.state.stage.value if self.state else 'N/A'}"
+                )
                 
                 # Анализ и выбор действия
                 logger.debug(f"Начало анализа и выбора действия на итерации {self.iteration}")
@@ -217,14 +244,32 @@ class Conductor:
                     # ШАГ 3: Проверка директором и принятие решения о завершении
                     logger.info("ШАГ 3: Проверка директором - принятие решения о завершении")
                     
-                    # Чтение памяти проекта для принятия решения
+                    # P1.1: Чтение памяти проекта для проверки выполнения задач
                     memory_context = await self._get_project_context()
                     task_history = memory_context.get("task_history", [])
                     completed_tasks = memory_context.get("completed_tasks", [])
+                    current_task = memory_context.get("current_task", {})
                     
                     logger.info(f"Всего задач в истории: {len(task_history)}, завершено: {len(completed_tasks)}")
                     
-                    # Завершение
+                    # P1.1: Проверка успешного выполнения последней задачи
+                    if completed_tasks:
+                        last_task = completed_tasks[-1]
+                        logger.info(f"Последняя задача: id={last_task.get('task_id')}, status={last_task.get('status')}")
+                        
+                        # Если последняя задача не выполнена успешно, требуется коррекция
+                        if last_task.get("status") != "completed":
+                            logger.warning(f"Последняя задача не выполнена (status={last_task.get('status')}), требуется коррекция")
+                            yield {
+                                "type": "needs_correction",
+                                "error": f"Последняя задача не выполнена успешно: {last_task.get('status')}"
+                            }
+                            # Не завершаем проект, возвращаемся к циклу
+                            self.state.stage = ProjectStage.EXECUTING
+                            await self._save_state()
+                            continue
+                    
+                    # Завершение только если все задачи выполнены успешно
                     self.state.stage = ProjectStage.DONE
                     await self._save_state()
                     

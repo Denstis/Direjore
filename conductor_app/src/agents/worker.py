@@ -107,6 +107,11 @@ class Worker:
                 self.allowed_tools = self.role_config.get("allowed_tools", [])
                 logger.info(f"Загружены инструменты из конфига роли {self.role_name}: {self.allowed_tools}")
             
+            # P1.3: Валидация названий инструментов - добавление списка доступных инструментов в промпт
+            available_tools = self.tool_registry.list_tools()
+            tool_names = [t.name for t in available_tools]
+            logger.info(f"Доступные инструменты в реестре: {tool_names}")
+            
             allowed_schemas = self.tool_registry.get_tools_for_openai(self.allowed_tools)
             
             # Проверка что инструменты действительно доступны
@@ -123,6 +128,20 @@ class Worker:
                 # Добавляем предупреждение в сообщения агенту
                 warning_msg = f"ПРЕДУПРЕЖДЕНИЕ: Следующие инструменты недоступны: {missing_tools}. Используйте только доступные инструменты."
                 self.messages.append({"role": "system", "content": warning_msg})
+            
+            # P1.3: Добавление списка доступных инструментов в системный промпт для валидации названий
+            if tool_names:
+                tools_instruction = (
+                    f"\n\nДОСТУПНЫЕ ИНСТРУМЕНТЫ: {', '.join(tool_names)}\n"
+                    f"Используй ТОЛЬКО эти названия инструментов. Другие названия будут проигнорированы.\n"
+                    f"Пример правильного вызова: {{\"name\": \"write_file\", \"arguments\": {{...}}}}"
+                )
+                # Добавляем к системному промпту или отдельным сообщением
+                if self.messages and self.messages[0]["role"] == "system":
+                    self.messages[0]["content"] += tools_instruction
+                else:
+                    self.messages.insert(0, {"role": "system", "content": tools_instruction})
+                logger.info("Добавлена инструкция по доступным инструментам в системный промпт")
             
             logger.debug(f"Разрешено инструментов: {len(allowed_schemas)}, список: {self.allowed_tools}")
             

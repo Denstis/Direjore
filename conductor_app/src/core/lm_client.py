@@ -115,6 +115,7 @@ class LMStudioClient:
         max_tokens: Optional[int] = None,
         stream: bool = False,
         parallel_tool_calls: bool = False,
+        timeout: Optional[float] = 60.0,  # P3.1: Таймаут по умолчанию 60 секунд
         **kwargs
     ) -> Any:
         """
@@ -130,12 +131,13 @@ class LMStudioClient:
             max_tokens: Максимум токенов в ответе
             stream: Включить streaming
             parallel_tool_calls: Разрешить параллельный вызов инструментов
+            timeout: Таймаут запроса в секундах (P3.1)
             
         Returns:
             Response object от OpenAI клиента
         """
         try:
-            # Проверка наличия загруженной модели в LM Studio
+            # P3.1: Обёртка вызова LLM с таймаутом для предотвращения зависаний
             logger.debug(f"Проверка доступности модели {model} в LM Studio")
             available_models = await self.list_models()
             available_ids = [m.id for m in available_models]
@@ -177,11 +179,15 @@ class LMStudioClient:
             # Добавляем дополнительные аргументы
             args.update(kwargs)
             
-            logger.info(f"Вызов chat_completion для модели {model}, tools={len(tools) if tools else 0}, stream={stream}")
+            logger.info(f"Вызов chat_completion для модели {model}, tools={len(tools) if tools else 0}, stream={stream}, timeout={timeout}s")
             logger.debug(f"Параметры запроса: temperature={temperature}, max_tokens={max_tokens}, top_p={top_p}")
             logger.debug(f"Количество сообщений в запросе: {len(messages)}")
             
-            response = await self.openai_client.chat.completions.create(**args)
+            # P3.1: Вызов с таймаутом через asyncio.wait_for
+            response = await asyncio.wait_for(
+                self.openai_client.chat.completions.create(**args),
+                timeout=timeout
+            )
             
             logger.debug(f"Получен ответ от API для модели {model}")
             
@@ -198,6 +204,11 @@ class LMStudioClient:
                     logger.debug("Ответ получен (информация о использовании токенов недоступна)")
                 return response
                 
+        except asyncio.TimeoutError:
+            # P3.1: Обработка таймаута LLM вызова
+            error_msg = f"Превышен таймаут запроса к LLM ({timeout}с). Модель не ответила вовремя."
+            logger.error(error_msg)
+            raise TimeoutError(error_msg)
         except ValueError as e:
             # Пробрасываем ошибки валидации дальше
             logger.error(f"Ошибка валидации модели: {e}")

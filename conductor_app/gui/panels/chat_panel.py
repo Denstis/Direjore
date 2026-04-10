@@ -290,7 +290,7 @@ class ChatPanel:
         self.history_text.tag_config("tool", foreground="#996600", lmargin1=10, lmargin2=10, font=("Consolas", 9))
         self.history_text.tag_config("timestamp", foreground="#999999", font=("Segoe UI", 8))
         
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, collapsible: bool = False) -> None:
         """Добавление сообщения в историю."""
         self.history_text.config(state=tk.NORMAL)
         
@@ -310,20 +310,59 @@ class ChatPanel:
         self.history_text.insert(tk.END, timestamp, "timestamp")
         self.history_text.insert(tk.END, "\n")
         
-        # Вставка роли и контента
-        self.history_text.insert(tk.END, f"{icon} ", role)
-        
-        # Форматирование JSON
-        if isinstance(content, dict):
-            formatted = json.dumps(content, ensure_ascii=False, indent=2)
-            self.history_text.insert(tk.END, formatted, role)
-        else:
-            self.history_text.insert(tk.END, content, role)
+        # Если collapsible=True, создаём спойлер
+        if collapsible and isinstance(content, str) and "\n" in content:
+            # Разделяем на заголовок и тело
+            lines = content.split("\n", 1)
+            header = lines[0]
+            body = lines[1] if len(lines) > 1 else ""
             
-        self.history_text.insert(tk.END, "\n\n")
+            # Вставляем заголовок
+            self.history_text.insert(tk.END, f"{icon} {header}\n", role)
+            
+            # Создаём спойлер (текст, который можно скрыть/показать)
+            spoiler_start = self.history_text.index(tk.END)
+            self.history_text.insert(tk.END, body + "\n\n", role)
+            spoiler_end = self.history_text.index(tk.END)
+            
+            # Добавляем тег для спойлера
+            self.history_text.tag_config("spoiler", background="#f0f0f0")
+            self.history_text.tag_bind("spoiler", "<Button-1>", lambda e: self._toggle_spoiler(spoiler_start, spoiler_end))
+            self.history_text.tag_add("spoiler", spoiler_start, spoiler_end)
+            
+            # Добавляем подсказку
+            self.history_text.insert(tk.END, "  [Нажмите, чтобы свернуть/развернуть]\n", "timestamp")
+        else:
+            # Вставка роли и контента обычным способом
+            self.history_text.insert(tk.END, f"{icon} ", role)
+            
+            # Форматирование JSON
+            if isinstance(content, dict):
+                formatted = json.dumps(content, ensure_ascii=False, indent=2)
+                self.history_text.insert(tk.END, formatted, role)
+            else:
+                self.history_text.insert(tk.END, content, role)
+                
+            self.history_text.insert(tk.END, "\n\n")
         
         self.history_text.config(state=tk.DISABLED)
         self.history_text.see(tk.END)
+    
+    def _toggle_spoiler(self, start: str, end: str) -> None:
+        """Переключение видимости спойлера."""
+        try:
+            # Проверяем текущее состояние
+            tags = self.history_text.tag_names(f"{start}+1c")
+            if "hidden" in tags:
+                # Показываем спойлер
+                self.history_text.tag_remove("hidden", start, end)
+                self.history_text.tag_config("hidden", elide=False)
+            else:
+                # Скрываем спойлер
+                self.history_text.tag_config("hidden", elide=True)
+                self.history_text.tag_add("hidden", start, end)
+        except Exception as e:
+            logger.warning(f"Ошибка переключения спойлера: {e}")
         
     def show_question(self, question: str, options: List[str]) -> None:
         """Показ вопроса пользователю."""

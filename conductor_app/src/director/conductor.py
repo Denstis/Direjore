@@ -180,6 +180,7 @@ class Conductor:
                         "type": "delegated",
                         "role": action.payload.role,
                         "task": action.payload.task,
+                        "tools": all_allowed_tools,
                     }
                     
                     # Выполнение агентом (Worker)

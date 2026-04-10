@@ -128,6 +128,9 @@ class Conductor:
         """
         logger.info(f"Получен запрос от пользователя: {user_message[:100]}...")
         
+        # Логирование в историю чата
+        await self._log_chat_message("USER", user_message)
+        
         if self.cancel_flag:
             logger.warning("Операция прервана флагом cancel_flag")
             yield {"type": "cancelled", "message": "Операция прервана"}
@@ -313,6 +316,12 @@ class Conductor:
         # Построение контекста
         system_prompt = self.role_config.get("system_prompt", "")
         
+        # Добавление списка доступных инструментов в системный промпт
+        tools_instructions = self._build_tools_instructions()
+        if tools_instructions:
+            system_prompt = f"{system_prompt}\n\n{tools_instructions}"
+            logger.debug(f"Добавлены инструкции по инструментам ({len(tools_instructions)} символов)")
+        
         messages = [
             {"role": "system", "content": system_prompt},
         ]
@@ -402,6 +411,68 @@ class Conductor:
             "active_role": self.state.active_role,
             "last_error": self.state.last_error,
         }
+
+    def _build_tools_instructions(self) -> str:
+        """
+        Построить инструкции по доступным инструментам для системного промпта.
+        
+        Returns:
+            Строка с описанием всех доступных инструментов и их назначением
+        """
+        if not self.tool_registry:
+            return ""
+            
+        tools_list = self.tool_registry.list_tools()
+        if not tools_list:
+            return ""
+        
+        # Группировка инструментов по категориям
+        categories: dict[str, list[dict]] = {}
+        for tool in tools_list:
+            category = tool.get("category", "other")
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(tool)
+        
+        # Построение инструкций
+        instructions = [
+            "## ДОСТУПНЫЕ ИНСТРУМЕНТЫ:",
+            "При делегировании задач исполнителям (coder, researcher и др.), используйте только следующие инструменты:",
+            ""
+        ]
+        
+        category_names_ru = {
+            "file": "Файловые операции",
+            "system": "Системные команды",
+            "network": "Сетевые операции",
+            "memory": "Операции с памятью",
+            "other": "Прочее"
+        }
+        
+        for category, tools in sorted(categories.items()):
+            cat_name = category_names_ru.get(category, category.capitalize())
+            instructions.append(f"### {cat_name}:")
+            
+            for tool in tools:
+                name = tool["name"]
+                desc = tool.get("description", "Нет описания")
+                # Краткое описание (первая фраза)
+                short_desc = desc.split(".")[0] if "." in desc else desc[:100]
+                instructions.append(f"  - `{name}` — {short_desc}")
+            
+            instructions.append("")
+        
+        instructions.extend([
+            "ВАЖНО:",
+            "- Используйте только перечисленные выше инструменты",
+            "- Не выдумывайте названия инструментов",
+            "- Для создания файлов используйте `write_file` или `mkdir`",
+            "- Для чтения файлов используйте `read_file`",
+            "- Для редактирования используйте `edit_file`",
+            ""
+        ])
+        
+        return "\n".join(instructions)
 
     # =============================================================================
     # МЕТОДЫ ДЛЯ АЛГОРИТМА ПЕРЕДАЧИ КОНТЕКСТА
@@ -560,3 +631,75 @@ class Conductor:
     def reset_cancel(self) -> None:
         """Сброс флага прерывания."""
         self.cancel_flag = False
+
+    async def _log_chat_message(self, role: str, content: str) -> None:
+        """
+        Логирование сообщений чата в историю.
+        
+        Args:
+            role: Роль отправителя (USER, ASSISTANT, SYSTEM, ERROR)
+            content: Текст сообщения
+        """
+        log_file = self.project_path / "logs" / "chat_history.log"
+        
+        # Создание директории логов если не существует
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"[{timestamp}] {role}: {content}\n"
+        
+        try:
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+            logger.debug(f"Сообщение чата записано в лог: {role}")
+        except Exception as e:
+            logger.error(f"Ошибка записи в лог чата: {e}")
+
+    async def _log_event(self, event_type: str, data: dict) -> None:
+        """
+        Логирование событий выполнения в историю чата.
+        
+        Args:
+            event_type: Тип события (tool_call, tool_result, delegated, etc.)
+            data: Данные события
+        """
+        log_file = self.project_path / "logs" / "chat_history.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Форматирование сообщения в зависимости от типа события
+        if event_type == "tool_call":
+            tool = data.get("tool", "unknown")
+            args = data.get("arguments", {})
+            content = f"Вызов инструмента: {tool}({json.dumps(args, ensure_ascii=False)})"
+            role = "SYSTEM"
+        elif event_type == "tool_result":
+            tool = data.get("tool", "unknown")
+            success = data.get("success", False)
+            content = f"Результат инструмента {tool}: {'OK' if success else 'ERROR'}"
+            role = "SYSTEM"
+        elif event_type == "delegated":
+            role_name = data.get("role", "unknown")
+            task = data.get("task", "")[:100]
+            content = f"Делегировано роли {role_name}: {task}"
+            role = "SYSTEM"
+        elif event_type == "ask_user":
+            question = data.get("question", "")[:200]
+            content = f"Вопрос пользователю: {question}"
+            role = "SYSTEM"
+        elif event_type == "error":
+            error_msg = data.get("message", str(data))[:200]
+            content = f"Ошибка: {error_msg}"
+            role = "ERROR"
+        else:
+            content = json.dumps(data, ensure_ascii=False)[:200]
+            role = "SYSTEM"
+        
+        log_entry = f"[{timestamp}] {role}: {content}\n"
+        
+        try:
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(log_entry)
+        except Exception as e:
+            logger.error(f"Ошибка записи события в лог: {e}")

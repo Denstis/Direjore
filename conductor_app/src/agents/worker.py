@@ -171,7 +171,7 @@ class Worker:
             
             # P1.3: Валидация названий инструментов - добавление списка доступных инструментов в промпт
             available_tools = self.tool_registry.list_tools()
-            tool_names = [t.name for t in available_tools]
+            tool_names = [t["name"] for t in available_tools]
             logger.info(f"Доступные инструменты в реестре: {tool_names}")
             
             # ВАЖНО: Фильтрация запрошенных инструментов - используем ТОЛЬКО существующие

@@ -15,9 +15,19 @@ import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
-from src.core.platform_utils import safe_path_join as safe_join, is_windows
+from src.core.platform_utils import platform_utils
 
 logger = logging.getLogger(__name__)
+
+
+def safe_join(base_path: str, *paths: str) -> str:
+    """Безопасное соединение путей через platform_utils."""
+    return platform_utils.safe_join(base_path, *paths)
+
+
+def is_windows() -> bool:
+    """Проверка на Windows."""
+    return platform_utils.is_windows
 
 
 # Список запрещённых паттернов команд

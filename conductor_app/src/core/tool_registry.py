@@ -182,3 +182,20 @@ class ToolRegistry:
         if not expected_python_type:
             return True  # Неизвестный тип, пропускаем проверку
         return isinstance(value, expected_python_type)
+
+    def list_tools(self) -> list[dict]:
+        """
+        Получить список всех зарегистрированных инструментов.
+        
+        Returns:
+            Список словарей с информацией об инструментах
+        """
+        result = []
+        for name, schema in self._tools.items():
+            result.append({
+                "name": name,
+                "description": schema.get("description", ""),
+                "category": schema.get("category", "other"),
+                "has_handler": name in self._handlers,
+            })
+        return result

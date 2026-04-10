@@ -90,3 +90,6 @@ class PlatformDetector:
 
 # Глобальный экземпляр
 platform_utils = PlatformDetector()
+
+# Экспорт для совместимости
+safe_path_join = platform_utils.safe_join

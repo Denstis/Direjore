@@ -9,14 +9,27 @@ __pycache__/
 .venv/
 venv/
 env/
-ENV/
-.ENV/
+.env
+.env.local
+.env.*
 
 # Logs
 *.log
 
-# Environment variables
-.env
-.env.local
-.env.*
+# Coverage
+.coverage
+htmlcov/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Build
+build/
+dist/
+*.egg-info/
 ```

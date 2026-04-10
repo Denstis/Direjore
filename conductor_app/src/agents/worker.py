@@ -63,6 +63,68 @@ class Worker:
         with open(role_yaml, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
+    def _build_tools_instructions_for_agent(self, available_tools: list[dict]) -> str:
+        """
+        Построить инструкции по доступным инструментам для агента-исполнителя.
+        
+        Args:
+            available_tools: Список словарей с информацией об инструментах
+            
+        Returns:
+            Строка с описанием доступных инструментов и инструкциями
+        """
+        if not available_tools:
+            return ""
+        
+        # Группировка инструментов по категориям
+        categories: dict[str, list[dict]] = {}
+        for tool in available_tools:
+            category = tool.get("category", "other")
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(tool)
+        
+        # Построение инструкций
+        instructions = [
+            "## ДОСТУПНЫЕ ВАМ ИНСТРУМЕНТЫ:",
+            "Используйте ТОЛЬКО следующие инструменты. Другие названия будут проигнорированы.",
+            ""
+        ]
+        
+        category_names_ru = {
+            "file": "Файловые операции",
+            "system": "Системные команды",
+            "network": "Сетевые операции",
+            "memory": "Операции с памятью",
+            "other": "Прочее"
+        }
+        
+        for category, tools in sorted(categories.items()):
+            cat_name = category_names_ru.get(category, category.capitalize())
+            instructions.append(f"### {cat_name}:")
+            
+            for tool in tools:
+                name = tool["name"]
+                desc = tool.get("description", "Нет описания")
+                # Краткое описание (первая фраза)
+                short_desc = desc.split(".")[0] if "." in desc else desc[:100]
+                instructions.append(f"  - `{name}` — {short_desc}")
+            
+            instructions.append("")
+        
+        instructions.extend([
+            "ВАЖНО:",
+            "- Используйте ТОЛЬКО перечисленные выше названия инструментов",
+            "- Не выдумывайте названия инструментов",
+            "- Для создания файлов используйте `write_file` или `mkdir`",
+            "- Для чтения файлов используйте `read_file`",
+            "- Для редактирования используйте `edit_file`",
+            "- Пример вызова: {\"name\": \"write_file\", \"arguments\": {\"path\": \"test.txt\", \"content\": \"Hello\"}}",
+            ""
+        ])
+        
+        return "\n".join(instructions)
+
     async def execute(self):
         """
         Выполнение задачи роли.
@@ -112,6 +174,44 @@ class Worker:
             tool_names = [t.name for t in available_tools]
             logger.info(f"Доступные инструменты в реестре: {tool_names}")
             
+            # ВАЖНО: Фильтрация запрошенных инструментов - используем ТОЛЬКО существующие
+            valid_tools = []
+            invalid_tools_map = {}  # маппинг неверных имен на верные
+            
+            # Маппинг распространенных ошибочных названий на правильные
+            tool_name_corrections = {
+                "filesystem_create": "mkdir",
+                "filesystem_write": "write_file",
+                "filesystem_read": "read_file",
+                "filesystem_delete": "delete_file",
+                "filesystem_move": "move",
+                "file_create": "write_file",
+                "file_write": "write_file",
+                "file_read": "read_file",
+                "file_delete": "delete_file",
+                "dir_create": "mkdir",
+                "list_dir": "list_files",
+            }
+            
+            for requested_tool in self.allowed_tools:
+                if self.tool_registry.has_tool(requested_tool):
+                    valid_tools.append(requested_tool)
+                elif requested_tool.lower() in tool_name_corrections:
+                    corrected = tool_name_corrections[requested_tool.lower()]
+                    if self.tool_registry.has_tool(corrected):
+                        invalid_tools_map[requested_tool] = corrected
+                        valid_tools.append(corrected)
+                        logger.warning(f"Инструмент '{requested_tool}' заменен на '{corrected}'")
+                    else:
+                        logger.error(f"Инструмент '{requested_tool}' (коррекция: '{corrected}') не найден в реестре")
+                else:
+                    logger.error(f"Инструмент '{requested_tool}' не найден в реестре и не имеет коррекции")
+            
+            # Если были замены, обновляем allowed_tools
+            if invalid_tools_map:
+                self.allowed_tools = valid_tools
+                logger.info(f"Обновленный список инструментов: {self.allowed_tools}")
+            
             allowed_schemas = self.tool_registry.get_tools_for_openai(self.allowed_tools)
             
             # Проверка что инструменты действительно доступны
@@ -130,15 +230,11 @@ class Worker:
                 self.messages.append({"role": "system", "content": warning_msg})
             
             # P1.3: Добавление списка доступных инструментов в системный промпт для валидации названий
-            if tool_names:
-                tools_instruction = (
-                    f"\n\nДОСТУПНЫЕ ИНСТРУМЕНТЫ: {', '.join(tool_names)}\n"
-                    f"Используй ТОЛЬКО эти названия инструментов. Другие названия будут проигнорированы.\n"
-                    f"Пример правильного вызова: {{\"name\": \"write_file\", \"arguments\": {{...}}}}"
-                )
+            if available_tools:
+                tools_instruction = self._build_tools_instructions_for_agent(available_tools)
                 # Добавляем к системному промпту или отдельным сообщением
                 if self.messages and self.messages[0]["role"] == "system":
-                    self.messages[0]["content"] += tools_instruction
+                    self.messages[0]["content"] += "\n\n" + tools_instruction
                 else:
                     self.messages.insert(0, {"role": "system", "content": tools_instruction})
                 logger.info("Добавлена инструкция по доступным инструментам в системный промпт")

@@ -176,6 +176,9 @@ class Conductor:
                     self.state.active_role = action.payload.role
                     await self._save_state()
                     
+                    # Объединяем tools и allowed_tools для передачи Worker
+                    all_allowed_tools = list(set(action.payload.tools + action.payload.allowed_tools))
+                    
                     yield {
                         "type": "delegated",
                         "role": action.payload.role,
@@ -185,9 +188,6 @@ class Conductor:
                     
                     # Выполнение агентом (Worker)
                     from ..agents.worker import Worker
-                    
-                    # Объединяем tools и allowed_tools для передачи Worker
-                    all_allowed_tools = list(set(action.payload.tools + action.payload.allowed_tools))
                     
                     worker = Worker(
                         role_name=action.payload.role,

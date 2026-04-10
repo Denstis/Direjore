@@ -176,14 +176,14 @@ class Conductor:
                     self.state.active_role = action.payload.role
                     await self._save_state()
                     
-                    # Объединяем tools и allowed_tools для передачи Worker
-                    all_allowed_tools = list(set(action.payload.tools + action.payload.allowed_tools))
+                    # Получаем список инструментов из действия
+                    tool_list = action.payload.tools if action.payload.tools else []
                     
                     yield {
                         "type": "delegated",
                         "role": action.payload.role,
                         "task": action.payload.task,
-                        "tools": all_allowed_tools,
+                        "tools": tool_list,
                     }
                     
                     # Выполнение агентом (Worker)
@@ -192,7 +192,7 @@ class Conductor:
                     worker = Worker(
                         role_name=action.payload.role,
                         task=action.payload.task,
-                        tools=all_allowed_tools,
+                        tools=tool_list,
                         context_keys=action.payload.context_keys,
                         conductor=self,
                     )

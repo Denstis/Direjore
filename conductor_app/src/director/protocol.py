@@ -27,8 +27,7 @@ class DelegateAction(BaseModel):
     action: DirectorActionType = DirectorActionType.DELEGATE
     role: str = Field(..., description="Роль исполнителя: coder, researcher, tester")
     task: str = Field(..., description="Описание задачи для исполнителя")
-    tools: list[str] = Field(default_factory=list, description="Разрешённые инструменты")
-    allowed_tools: list[str] = Field(default_factory=list, description="Список разрешённых инструментов для валидации")
+    tools: list[str] = Field(default_factory=list, description="Разрешённые инструменты для выполнения задачи")
     context_keys: list[str] = Field(
         default_factory=list,
         description="Ключи контекста проекта для передачи"
@@ -68,8 +67,7 @@ class DirectorResponse(BaseModel):
     action: DirectorActionType
     role: Optional[str] = None
     task: Optional[str] = None
-    tools: list[str] = Field(default_factory=list)
-    allowed_tools: list[str] = Field(default_factory=list, description="Список разрешённых инструментов для валидации")
+    tools: list[str] = Field(default_factory=list, description="Разрешённые инструменты для выполнения задачи")
     context_keys: list[str] = Field(default_factory=list)
     timeout_seconds: int = 300
     question: Optional[str] = None

@@ -62,8 +62,8 @@ echo 💡 Убедитесь, что LM Studio запущен с моделью 
 echo 💡 Для остановки нажмите Ctrl+C
 echo.
 
-REM Запуск приложения
-python -m gui.app
+REM Запуск нового GUI (CustomTkinter)
+python run_new_gui.py
 
 REM Если приложение завершилось с ошибкой
 if %ERRORLEVEL% NEQ 0 (

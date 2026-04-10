@@ -5,3 +5,5 @@ PyYAML>=6.0.1
 aiohttp>=3.9.1
 beautifulsoup4>=4.12.3
 ttkbootstrap>=1.10.1
+customtkinter>=5.2.0
+darkdetect>=0.8.0
